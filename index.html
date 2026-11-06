@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ZED Academy</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+
+        <!-- =======================================================
+             1. AVTORIZATSIYA EKRANI (LOGIN VA RO'YXATDAN O'TISH)
+        ======================================================== -->
+        <div id="auth-screen" class="screen active">
+            <div class="auth-brand">
+                <div class="brand-logo">🎓</div>
+                <h1>ZED Academy</h1>
+                <p>Yagona raqamli ta'lim platformasi</p>
+            </div>
+
+            <div class="auth-tabs">
+                <button id="tab-login-btn" class="tab-btn active" onclick="switchAuthTab('login')">Kirish</button>
+                <button id="tab-reg-btn" class="tab-btn" onclick="switchAuthTab('register')">Ro'yxatdan o'tish</button>
+            </div>
+
+            <!-- LOGIN FORMASI -->
+            <form id="login-form" class="auth-card" onsubmit="handleLogin(event)">
+                <div class="input-group">
+                    <label>Login (Username)</label>
+                    <input type="text" id="login-username" class="input-field" placeholder="Loginingizni kiriting" required>
+                </div>
+                <div class="input-group">
+                    <label>Parol</label>
+                    <input type="password" id="login-password" class="input-field" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="primary-btn">🔐 Kabinetga kirish</button>
+
+                <div class="demo-box">
+                    <p class="demo-title">⚡ Tezkor sinov akkauntlari (ustiga bosing):</p>
+                    <div class="demo-chips">
+                        <span class="chip" onclick="fillDemo('admin', 'admin123')">⚙️ Admin</span>
+                        <span class="chip" onclick="fillDemo('javohir', 'teacher123')">👨‍🏫 Mr. Javohir</span>
+                        <span class="chip" onclick="fillDemo('malika', 'teacher123')">👩‍🏫 Ms. Malika</span>
+                        <span class="chip" onclick="fillDemo('sardor', '12345')">👨‍🎓 O'quvchi</span>
+                    </div>
+                </div>
+            </form>
+
+            <!-- RO'YXATDAN O'TISH FORMASI -->
+            <form id="register-form" class="auth-card hidden" onsubmit="handleRegister(event)">
+                <div class="tg-sync-banner">
+                    <span>✨ Telegram akkauntingiz avtomatik bog'lanadi</span>
+                </div>
+                <div class="input-group">
+                    <label>Ism va Familiya</label>
+                    <input type="text" id="reg-fullname" class="input-field" placeholder="Alisher Valiyev" required>
+                </div>
+                <div class="input-group">
+                    <label>Telefon raqam</label>
+                    <input type="tel" id="reg-phone" class="input-field" placeholder="+998 90 123 45 67" required>
+                </div>
+                <div class="input-group">
+                    <label>Guruhingizni tanlang</label>
+                    <select id="reg-group" class="input-field"></select>
+                </div>
+                <div class="input-group">
+                    <label>Yangi Login (Username)</label>
+                    <input type="text" id="reg-username" class="input-field" placeholder="alisher01" required>
+                </div>
+                <div class="input-group">
+                    <label>Yangi Parol</label>
+                    <input type="password" id="reg-password" class="input-field" placeholder="Kamida 4 ta belgi" required>
+                </div>
+                <button type="submit" class="primary-btn">🚀 Ro'yxatdan o'tish</button>
+            </form>
+        </div>
+
+        <!-- =======================================================
+             2. ASOSIY TIZIM EKRANI
+        ======================================================== -->
+        <div id="main-screen" class="screen">
+            <header class="header">
+                <div class="user-profile">
+                    <img id="header-avatar" src="https://ui-avatars.com/api/?name=ZED&background=EBF5FB&color=2980B9" alt="Avatar">
+                    <div>
+                        <h2 id="header-name">Foydalanuvchi</h2>
+                        <span id="header-role-badge" class="role-badge">Rol</span>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="logout()">Chiqish 🚪</button>
+            </header>
+
+            <!-- ================= A) O'QUVCHI KABINETI ================= -->
+            <div id="student-cabinet" class="cabinet hidden">
+                <div id="student-home" class="sub-view active">
+                    <!-- Guruh va keyingi dars vaqti banneri -->
+                    <div class="lesson-time-banner" id="st-lesson-banner">
+                        <div class="banner-top">
+                            <span class="live-dot"></span>
+                            <span id="st-banner-group">Guruh yuklanmoqda...</span>
+                        </div>
+                        <h3 id="st-banner-time">⏰ Dars vaqti: --:--</h3>
+                        <p id="st-banner-info">👨‍🏫 Ustoz: - | 🚪 Xona: -</p>
+                    </div>
+
+                    <div class="stats-row">
+                        <div class="stat-box">
+                            <span class="stat-value" id="st-level">-</span>
+                            <span class="stat-label">Daraja</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-value" id="st-rate">100%</span>
+                            <span class="stat-label">Davomat</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-value" id="st-hw-count">0 ta</span>
+                            <span class="stat-label">Vazifalar</span>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-menu">
+                        <div class="menu-card" onclick="openStudentSubView('st-pay-view')">
+                            <div class="card-icon">💳</div>
+                            <div class="card-info">
+                                <h3>Onlayn To'lov & Chek yuborish</h3>
+                                <p>Karta orqali to'lash va chekni tasdiqlatish</p>
+                            </div>
+                            <span class="arrow">›</span>
+                        </div>
+
+                        <div class="menu-card" onclick="openStudentSubView('st-att-view')">
+                            <div class="card-icon">📅</div>
+                            <div class="card-info">
+                                <h3>Davomat tarixi</h3>
+                                <p>Qatnashgan va qoldirilgan darslar</p>
+                            </div>
+                            <span class="arrow">›</span>
+                        </div>
+
+                        <div class="menu-card" onclick="openStudentSubView('st-hw-view')">
+                            <div class="card-icon">📝</div>
+                            <div class="card-info">
+                                <h3>Uyga vazifalar</h3>
+                                <p>Ustoz bergan topshiriqlar va muddatlar</p>
+                            </div>
+                            <span class="arrow">›</span>
+                        </div>
+
+                        <div class="menu-card" onclick="openStudentSubView('st-group-view')">
+                            <div class="card-icon">👥</div>
+                            <div class="card-info">
+                                <h3>Guruhim ma'lumotlari</h3>
+                                <p>To'liq dars jadvali va kurs narxi</p>
+                            </div>
+                            <span class="arrow">›</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- O'quvchi: Onlayn To'lov va Chek yuborish -->
+                <div id="st-pay-view" class="sub-view">
+                    <div class="sub-header">
+                        <button class="back-btn" onclick="backToStudentHome()">‹ Orqaga</button>
+                        <h3>💳 Onlayn To'lov</h3>
+                    </div>
+
+                    <div class="bank-card">
+                        <div class="bank-card-top">
+                            <span id="st-card-bank">Uzcard / Humo</span>
+                            <span>ZED ACADEMY</span>
+                        </div>
+                        <div class="bank-card-number" id="st-card-number" onclick="copyCardNumber()">
+                            8600 0000 0000 0000 📋
+                        </div>
+                        <div class="bank-card-bottom">
+                            <div>
+                                <small>Karta egasi:</small>
+                                <p id="st-card-holder">ADMIN</p>
+                            </div>
+                            <button type="button" class="copy-small-btn" onclick="copyCardNumber()">Nusxalash</button>
+                        </div>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>📤 To'lov chekini (skrinshot) yuborish</h3>
+                        <label class="field-label">To'lov oyi:</label>
+                        <select id="st-pay-month" class="input-field">
+                            <option value="Noyabr, 2026">Noyabr, 2026</option>
+                            <option value="Dekabr, 2026">Dekabr, 2026</option>
+                            <option value="Yanvar, 2027">Yanvar, 2027</option>
+                        </select>
+
+                        <label class="field-label">To'langan summa (so'mda):</label>
+                        <input type="number" id="st-pay-amount" class="input-field" value="450000" placeholder="450000">
+
+                        <label class="field-label">To'lov cheki rasmi (skrinshot):</label>
+                        <input type="file" id="st-pay-file" class="input-field" accept="image/*" onchange="previewReceipt(event)">
+                        <div id="st-receipt-preview-box" class="receipt-preview hidden">
+                            <img id="st-receipt-img" src="" alt="Chek">
+                        </div>
+
+                        <button class="primary-btn" onclick="submitStudentPayment()">🚀 Chekni Adminga yuborish</button>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>Mening to'lovlarim tarixi</h3>
+                        <div id="st-pay-list" class="list-box"></div>
+                    </div>
+                </div>
+
+                <!-- O'quvchi: Davomat -->
+                <div id="st-att-view" class="sub-view">
+                    <div class="sub-header">
+                        <button class="back-btn" onclick="backToStudentHome()">‹ Orqaga</button>
+                        <h3>📅 Mening davomatim</h3>
+                    </div>
+                    <div id="st-att-list" class="list-box"></div>
+                </div>
+
+                <!-- O'quvchi: Vazifalar -->
+                <div id="st-hw-view" class="sub-view">
+                    <div class="sub-header">
+                        <button class="back-btn" onclick="backToStudentHome()">‹ Orqaga</button>
+                        <h3>📝 Uyga vazifalar</h3>
+                    </div>
+                    <div id="st-hw-list" class="list-box"></div>
+                </div>
+
+                <!-- O'quvchi: Guruh -->
+                <div id="st-group-view" class="sub-view">
+                    <div class="sub-header">
+                        <button class="back-btn" onclick="backToStudentHome()">‹ Orqaga</button>
+                        <h3>👥 Mening guruhim</h3>
+                    </div>
+                    <div id="st-group-details"></div>
+                </div>
+            </div>
+
+            <!-- ================= B) O'QITUVCHI KABINETI ================= -->
+            <div id="teacher-cabinet" class="cabinet hidden">
+                <!-- O'qituvchining dars vaqtlari va jadvali -->
+                <div class="panel-card">
+                    <h3>⏰ Mening guruhlarim va Dars vaqtlari</h3>
+                    <div id="teacher-schedule-cards" class="schedule-grid"></div>
+                </div>
+
+                <div class="section-tabs">
+                    <button class="sec-tab active" onclick="switchTeacherTab('t-att', this)">📋 Yo'qlama qilish</button>
+                    <button class="sec-tab" onclick="switchTeacherTab('t-hw', this)">📚 Vazifa berish</button>
+                </div>
+
+                <!-- 1. Yo'qlama -->
+                <div id="t-att" class="tab-panel active">
+                    <div class="panel-card">
+                        <h3>Guruh yo'qlamasini belgilash</h3>
+                        <label class="field-label">Guruhni tanlang:</label>
+                        <select id="teacher-group-select" class="input-field" onchange="renderTeacherStudents()"></select>
+
+                        <div id="teacher-selected-time" class="time-pill">⏰ Dars vaqti: -</div>
+
+                        <label class="field-label">Bugungi dars mavzusi:</label>
+                        <input type="text" id="teacher-topic" class="input-field" placeholder="Masalan: Unit 6 - Passive Voice">
+
+                        <div id="teacher-student-list" class="list-box" style="margin: 14px 0;"></div>
+
+                        <button class="primary-btn" onclick="submitAttendance()">✅ Davomatni saqlash</button>
+                    </div>
+                </div>
+
+                <!-- 2. Uyga vazifa -->
+                <div id="t-hw" class="tab-panel">
+                    <div class="panel-card">
+                        <h3>Yangi uyga vazifa berish</h3>
+                        <label class="field-label">Guruh:</label>
+                        <select id="hw-group-select" class="input-field"></select>
+
+                        <label class="field-label">Vazifa tavsifi:</label>
+                        <input type="text" id="hw-title-input" class="input-field" placeholder="Workbook Unit 6, p. 42-44">
+
+                        <label class="field-label">Topshirish muddati:</label>
+                        <input type="text" id="hw-deadline-input" class="input-field" placeholder="12-Noyabr, 2026">
+
+                        <button class="primary-btn" onclick="submitHomework()">➕ Vazifani yuborish</button>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>Berilgan vazifalar</h3>
+                        <div id="teacher-hw-list" class="list-box"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= C) ADMIN / DIREKTOR KABINETI ================= -->
+            <div id="admin-cabinet" class="cabinet hidden">
+                <div class="admin-stats-grid">
+                    <div class="stat-box">
+                        <span class="stat-value" id="adm-st-count">0</span>
+                        <span class="stat-label">O'quvchilar</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-value" id="adm-tc-count">0</span>
+                        <span class="stat-label">O'qituvchilar</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-value" id="adm-gr-count">0</span>
+                        <span class="stat-label">Guruhlar</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-value" id="adm-rev">0</span>
+                        <span class="stat-label">Tasdiqlangan tushum</span>
+                    </div>
+                </div>
+
+                <div class="section-tabs">
+                    <button class="sec-tab active" onclick="switchAdminTab('adm-users', this)">👤 Akkauntlar</button>
+                    <button class="sec-tab" onclick="switchAdminTab('adm-groups', this)">👥 Guruhlar</button>
+                    <button class="sec-tab" onclick="switchAdminTab('adm-pay', this)">💳 To'lov <span id="pending-badge" class="mini-badge hidden">0</span></button>
+                    <button class="sec-tab" onclick="switchAdminTab('adm-reports', this)">📊 Hisobot</button>
+                </div>
+
+                <!-- 1. AKKAUNTLAR (O'QUVCHI VA O'QITUVCHILAR CRUD) -->
+                <div id="adm-users" class="tab-panel active">
+                    <div class="panel-card">
+                        <h3 id="user-form-title">➕ Yangi O'quvchi / O'qituvchi ochish</h3>
+                        <input type="hidden" id="adm-u-edit-id">
+
+                        <label class="field-label">Rolni tanlang:</label>
+                        <select id="adm-u-role" class="input-field" onchange="toggleAdminGroupSelect()">
+                            <option value="student">👨‍🎓 O'quvchi (Student)</option>
+                            <option value="teacher">👨‍🏫 O'qituvchi (Teacher)</option>
+                            <option value="admin">⚙️ Boshqaruvchi (Admin)</option>
+                        </select>
+
+                        <label class="field-label">Ism va Familiya:</label>
+                        <input type="text" id="adm-u-name" class="input-field" placeholder="Masalan: Mr. Sardor yoki Ali Valiyev">
+
+                        <label class="field-label">Telefon raqam:</label>
+                        <input type="tel" id="adm-u-phone" class="input-field" placeholder="+998 90 123 45 67">
+
+                        <div id="adm-u-group-wrap">
+                            <label class="field-label">Guruhi (faqat o'quvchi uchun):</label>
+                            <select id="adm-u-group" class="input-field"></select>
+                        </div>
+
+                        <label class="field-label">Kirish uchun Login (username):</label>
+                        <input type="text" id="adm-u-login" class="input-field" placeholder="login123">
+
+                        <label class="field-label">Kirish uchun Parol:</label>
+                        <input type="text" id="adm-u-pass" class="input-field" placeholder="parol123">
+
+                        <div class="btn-row">
+                            <button class="primary-btn" id="adm-u-submit-btn" onclick="adminSaveUser()">➕ Saqlash</button>
+                            <button class="secondary-btn hidden" id="adm-u-cancel-btn" onclick="resetUserForm()">Bekor qilish</button>
+                        </div>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>👨‍🏫 O'qituvchilar ro'yxati</h3>
+                        <div id="adm-teachers-list" class="list-box"></div>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>👨‍🎓 O'quvchilar ro'yxati</h3>
+                        <div id="adm-students-list" class="list-box"></div>
+                    </div>
+                </div>
+
+                <!-- 2. GURUHLAR (QO'SHISH, TAHRIRLASH, O'CHIRISH) -->
+                <div id="adm-groups" class="tab-panel">
+                    <div class="panel-card">
+                        <h3 id="group-form-title">➕ Yangi guruh ochish</h3>
+                        <input type="hidden" id="adm-g-edit-id">
+
+                        <label class="field-label">Guruh nomi:</label>
+                        <input type="text" id="adm-g-name" class="input-field" placeholder="Pre-Intermediate 04">
+
+                        <label class="field-label">Ingliz tili darajasi (Level):</label>
+                        <input type="text" id="adm-g-level" class="input-field" placeholder="Pre-Intermediate">
+
+                        <label class="field-label">Biriktirilgan O'qituvchi:</label>
+                        <select id="adm-g-teacher" class="input-field"></select>
+
+                        <label class="field-label">Dars kunlari:</label>
+                        <input type="text" id="adm-g-days" class="input-field" placeholder="Dush - Chor - Jum">
+
+                        <label class="field-label">Dars boshlanish va tugash vaqti:</label>
+                        <input type="text" id="adm-g-time" class="input-field" placeholder="14:00 - 15:30">
+
+                        <label class="field-label">Xona:</label>
+                        <input type="text" id="adm-g-room" class="input-field" placeholder="Xona #3">
+
+                        <label class="field-label">Oylik kurs narxi (so'mda):</label>
+                        <input type="number" id="adm-g-price" class="input-field" value="450000" placeholder="450000">
+
+                        <div class="btn-row">
+                            <button class="primary-btn" id="adm-g-submit-btn" onclick="adminSaveGroup()">➕ Guruhni saqlash</button>
+                            <button class="secondary-btn hidden" id="adm-g-cancel-btn" onclick="resetGroupForm()">Bekor qilish</button>
+                        </div>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>Mavjud guruhlar (Tahrirlash / O'chirish)</h3>
+                        <div id="adm-groups-list" class="list-box"></div>
+                    </div>
+                </div>
+
+                <!-- 3. TO'LOVLAR VA KARTA SOZLAMALARI -->
+                <div id="adm-pay" class="tab-panel">
+                    <div class="panel-card">
+                        <h3>💳 Onlayn to'lov uchun Karta ma'lumotlari</h3>
+                        <label class="field-label">Plastik karta raqami:</label>
+                        <input type="text" id="adm-card-number" class="input-field" placeholder="8600 1234 5678 9012">
+                        <label class="field-label">Karta egasi (Ism Familiya):</label>
+                        <input type="text" id="adm-card-holder" class="input-field" placeholder="ABDURAHMON ABDUMOMINOV">
+                        <label class="field-label">Bank yoki Izoh:</label>
+                        <input type="text" id="adm-card-bank" class="input-field" placeholder="Uzcard / Humo">
+                        <button class="primary-btn" onclick="adminSaveCard()">💾 Karta ma'lumotlarini saqlash</button>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>⏳ Tasdiqlash kutilayotgan cheklar</h3>
+                        <div id="adm-pending-payments" class="list-box"></div>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>💵 Naqd to'lov kiritish</h3>
+                        <select id="adm-p-student" class="input-field"></select>
+                        <input type="text" id="adm-p-month" class="input-field" value="Noyabr, 2026" placeholder="To'lov oyi">
+                        <input type="number" id="adm-p-amount" class="input-field" value="450000" placeholder="450000">
+                        <button class="primary-btn" onclick="adminCreatePayment()">✅ To'lovni kiritish</button>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>Barcha to'lovlar tarixi</h3>
+                        <div id="adm-pay-list" class="list-box"></div>
+                    </div>
+                </div>
+
+                <!-- 4. STATISTIK HISOBOTLAR -->
+                <div id="adm-reports" class="tab-panel">
+                    <div class="panel-card">
+                        <div class="report-header">
+                            <h3>📊 Markaz Umumiy Hisoboti</h3>
+                            <button class="export-btn" onclick="exportReportsCSV()">📥 Excel (CSV) yuklash</button>
+                        </div>
+
+                        <div class="report-summary-list" id="adm-report-summary"></div>
+                    </div>
+
+                    <div class="panel-card">
+                        <h3>📈 Guruhlar kesimida hisobot jadvali</h3>
+                        <div class="table-responsive">
+                            <table class="report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Guruh</th>
+                                        <th>Ustoz</th>
+                                        <th>O'quvchi</th>
+                                        <th>Davomat</th>
+                                        <th>Tushum</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adm-report-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- CHEK RASMINI KATTALASHTIRIB KO'RISH MODALI -->
+        <div id="receipt-modal" class="modal hidden" onclick="closeReceiptModal()">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h4>🧾 To'lov cheki nusxasi</h4>
+                    <button class="close-btn" onclick="closeReceiptModal()">✕</button>
+                </div>
+                <img id="modal-receipt-img" src="" alt="Chek rasmi">
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

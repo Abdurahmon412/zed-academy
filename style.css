@@ -1,0 +1,760 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --bg-main: #F4F9FD;
+    --white: #FFFFFF;
+    --primary-blue: #2980B9;
+    --accent-blue: #3498DB;
+    --light-blue: #EBF5FB;
+    --border-blue: #D6EAF8;
+    --text-dark: #1E293B;
+    --text-muted: #64748B;
+    --success-bg: #E8F8F5;
+    --success-text: #16A34A;
+    --danger-bg: #FDEDEC;
+    --danger-text: #DC2626;
+    --warning-bg: #FEF9E7;
+    --warning-text: #D97706;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-dark);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.app-container {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 14px;
+    padding-bottom: 45px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.screen {
+    display: none;
+}
+
+.screen.active {
+    display: block;
+    animation: fade 0.22s ease;
+}
+
+@keyframes fade {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ================= AVTORIZATSIYA ================= */
+.auth-brand {
+    text-align: center;
+    margin: 14px 0 20px;
+}
+
+.brand-logo {
+    width: 62px;
+    height: 62px;
+    background: var(--light-blue);
+    border: 2px solid var(--border-blue);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    margin: 0 auto 8px;
+    box-shadow: 0 6px 15px rgba(52, 152, 219, 0.12);
+}
+
+.auth-brand h1 {
+    font-size: 23px;
+    color: var(--primary-blue);
+    font-weight: 700;
+}
+
+.auth-brand p {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.auth-tabs, .section-tabs {
+    display: flex;
+    background: var(--light-blue);
+    padding: 4px;
+    border-radius: 13px;
+    border: 1px solid var(--border-blue);
+    margin-bottom: 14px;
+    gap: 4px;
+}
+
+.tab-btn, .sec-tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 9px 6px;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary-blue);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tab-btn.active, .sec-tab.active {
+    background: var(--white);
+    box-shadow: 0 2px 7px rgba(41, 128, 185, 0.12);
+}
+
+.mini-badge {
+    background: var(--danger-text);
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    margin-left: 3px;
+}
+
+.auth-card, .panel-card {
+    background: var(--white);
+    border: 1px solid var(--border-blue);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 16px rgba(52, 152, 219, 0.05);
+}
+
+.panel-card h3 {
+    font-size: 15.5px;
+    color: var(--primary-blue);
+    margin-bottom: 12px;
+}
+
+.input-group {
+    margin-bottom: 12px;
+}
+
+.input-group label, .field-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 5px;
+}
+
+.input-field {
+    width: 100%;
+    padding: 11px 13px;
+    border: 1px solid var(--border-blue);
+    background: var(--bg-main);
+    border-radius: 11px;
+    font-size: 13.5px;
+    color: var(--text-dark);
+    margin-bottom: 10px;
+    outline: none;
+}
+
+.input-group .input-field {
+    margin-bottom: 0;
+}
+
+.input-field:focus {
+    border-color: var(--accent-blue);
+    background: var(--white);
+}
+
+.btn-row {
+    display: flex;
+    gap: 8px;
+}
+
+.primary-btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 11px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--primary-blue));
+    color: var(--white);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(52, 152, 219, 0.22);
+}
+
+.secondary-btn {
+    padding: 12px 16px;
+    border: 1px solid var(--border-blue);
+    border-radius: 11px;
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tg-sync-banner {
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    padding: 9px;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 12px;
+    border: 1px dashed var(--accent-blue);
+}
+
+.demo-box {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-blue);
+}
+
+.demo-title {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.demo-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+}
+
+.chip {
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    border: 1px solid var(--border-blue);
+    padding: 6px 9px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* ================= HEADER ================= */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--white);
+    padding: 12px 15px;
+    border-radius: 15px;
+    border: 1px solid var(--border-blue);
+    margin-bottom: 14px;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+}
+
+.user-profile img {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-blue);
+}
+
+.user-profile h2 {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.role-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    margin-top: 2px;
+}
+
+.logout-btn {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border: none;
+    padding: 7px 11px;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* ================= DARS VAQTI VA BANK KARTASI ================= */
+.lesson-time-banner {
+    background: linear-gradient(135deg, #2980B9, #3498DB);
+    color: var(--white);
+    padding: 16px;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 5px 15px rgba(41, 128, 185, 0.25);
+}
+
+.banner-top {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.95;
+    margin-bottom: 6px;
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    background: #2ECC71;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #2ECC71;
+}
+
+.lesson-time-banner h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.lesson-time-banner p {
+    font-size: 12.5px;
+    opacity: 0.9;
+}
+
+.schedule-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.schedule-item {
+    background: var(--light-blue);
+    border: 1px solid var(--border-blue);
+    border-left: 4px solid var(--primary-blue);
+    padding: 12px 14px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.schedule-item h4 {
+    font-size: 14.5px;
+    color: var(--primary-blue);
+    margin-bottom: 3px;
+}
+
+.schedule-item p {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.time-badge {
+    background: var(--white);
+    color: var(--primary-blue);
+    border: 1px solid var(--border-blue);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+}
+
+.time-pill {
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    padding: 8px 12px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+/* Plastik Karta dizayni */
+.bank-card {
+    background: linear-gradient(135deg, #1E3C72, #2A5298);
+    color: var(--white);
+    padding: 18px;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 6px 18px rgba(30, 60, 114, 0.25);
+}
+
+.bank-card-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    opacity: 0.85;
+    margin-bottom: 14px;
+}
+
+.bank-card-number {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+    cursor: pointer;
+}
+
+.bank-card-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.bank-card-bottom small {
+    font-size: 10px;
+    opacity: 0.75;
+}
+
+.bank-card-bottom p {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.copy-small-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    padding: 5px 10px;
+    border-radius: 7px;
+    font-size: 11.5px;
+    cursor: pointer;
+}
+
+.receipt-preview {
+    margin: 8px 0 12px;
+    text-align: center;
+}
+
+.receipt-preview img {
+    max-width: 100%;
+    max-height: 220px;
+    border-radius: 10px;
+    border: 1px solid var(--border-blue);
+}
+
+/* ================= STATISTIKA VA MENYU ================= */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 9px;
+    margin-bottom: 14px;
+}
+
+.admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 9px;
+    margin-bottom: 14px;
+}
+
+.stat-box {
+    background: var(--white);
+    border: 1px solid var(--border-blue);
+    border-radius: 13px;
+    padding: 11px 8px;
+    text-align: center;
+}
+
+.stat-value {
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary-blue);
+    margin-bottom: 2px;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.dashboard-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.menu-card {
+    background: var(--white);
+    border: 1px solid var(--border-blue);
+    border-radius: 15px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    cursor: pointer;
+}
+
+.card-icon {
+    width: 46px;
+    height: 46px;
+    background: var(--light-blue);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+}
+
+.card-info {
+    flex: 1;
+}
+
+.card-info h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.card-info p {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.arrow {
+    font-size: 20px;
+    color: var(--accent-blue);
+}
+
+/* ================= RO'YXATLAR VA CRUD TUGMALAR ================= */
+.sub-view, .tab-panel {
+    display: none;
+}
+
+.sub-view.active, .tab-panel.active {
+    display: block;
+    animation: fade 0.2s ease;
+}
+
+.sub-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.back-btn {
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    border: 1px solid var(--border-blue);
+    padding: 6px 11px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.list-box {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.list-item {
+    background: var(--white);
+    border: 1px solid var(--border-blue);
+    border-radius: 13px;
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.item-main {
+    flex: 1;
+}
+
+.item-main h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.item-main p {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.item-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.icon-btn {
+    border: 1px solid var(--border-blue);
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    padding: 6px 9px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.icon-btn.danger {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-color: #FCA5A5;
+}
+
+.icon-btn.success {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: #86EFAC;
+}
+
+.badge {
+    padding: 4px 9px;
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge.success { background: var(--success-bg); color: var(--success-text); }
+.badge.danger { background: var(--danger-bg); color: var(--danger-text); }
+.badge.warning { background: var(--warning-bg); color: var(--warning-text); }
+.badge.info { background: var(--light-blue); color: var(--primary-blue); }
+
+.att-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.att-btn {
+    border: 1px solid var(--border-blue);
+    background: var(--bg-main);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.att-btn.present { background: var(--success-bg); color: var(--success-text); border-color: var(--success-text); }
+.att-btn.absent { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-text); }
+.att-btn.excused { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-text); }
+
+/* ================= HISOBOT JADVALI VA MODAL ================= */
+.report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.report-header h3 {
+    margin-bottom: 0;
+}
+
+.export-btn {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid #86EFAC;
+    padding: 7px 11px;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.report-summary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 9px 12px;
+    background: var(--bg-main);
+    border-radius: 9px;
+    font-size: 13px;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.report-table th, .report-table td {
+    padding: 9px 7px;
+    border-bottom: 1px solid var(--border-blue);
+    text-align: left;
+}
+
+.report-table th {
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    font-weight: 600;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 999;
+}
+
+.modal-content {
+    background: var(--white);
+    border-radius: 16px;
+    max-width: 420px;
+    width: 100%;
+    padding: 16px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.close-btn {
+    border: none;
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.modal-content img {
+    width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    border-radius: 10px;
+}
