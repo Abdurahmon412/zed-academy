@@ -5,7 +5,7 @@ const { Pool } = require('pg');
 const { Telegraf, Markup } = require('telegraf');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Chek rasmlarini Base64 formatda qabul qilish uchun limitni 15MB qilamiz
 app.use(express.json({ limit: '15mb' }));
@@ -529,9 +529,9 @@ app.post('/api/admin/payments', async (req, res) => {
 });
 
 // index.js faylining eng pastki qismi:
-const WEB_APP_URL = process.env.WEB_APP_URL || 'http://localhost:3000';
+const WEB_APP_URL = process.env.WEB_APP_URL || 'https://zed-academy.onrender.com';
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 Server ishga tushdi: port ${PORT}`);
   startBot(WEB_APP_URL);
 });
