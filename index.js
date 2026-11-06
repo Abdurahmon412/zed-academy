@@ -9,7 +9,11 @@ const PORT = process.env.PORT || 3000;
 
 // Chek rasmlarini Base64 formatda qabul qilish uchun limitni 15MB qilamiz
 app.use(express.json({ limit: '15mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
