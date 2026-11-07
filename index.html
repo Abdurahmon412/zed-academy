@@ -4,30 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ZED Academy Portal</title>
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Lucide Vector Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Background Ambient Glow -->
   <div class="ambient-glow glow-1"></div>
   <div class="ambient-glow glow-2"></div>
 
   <div class="app-shell">
-    <!-- ==================== AUTH / LOGIN & REGISTER VIEW ==================== -->
+    <!-- ==================== AUTH VIEW ==================== -->
     <section id="auth-view" class="view-section active">
       <div class="auth-top-bar">
         <div class="brand-pill">
           <i data-lucide="graduation-cap" class="icon-sm"></i>
           <span>ZED Academy</span>
         </div>
-        <button type="button" class="icon-btn" id="auth-theme-toggle" title="Toggle Dark/Light Mode">
+        <button type="button" class="icon-btn" id="auth-theme-toggle" title="Toggle Theme">
           <i data-lucide="moon" class="theme-icon-moon"></i>
           <i data-lucide="sun" class="theme-icon-sun"></i>
         </button>
@@ -40,7 +36,6 @@
           </div>
         </div>
 
-        <!-- Mode Switcher Pills -->
         <div class="auth-mode-switch">
           <button type="button" class="auth-tab-btn active" id="tab-signin-btn">
             <i data-lucide="log-in" class="icon-xs"></i>
@@ -52,7 +47,7 @@
           </button>
         </div>
 
-        <!-- SIGN IN FORM -->
+        <!-- SIGN IN PANEL -->
         <div id="signin-panel">
           <h1 class="auth-title">Welcome Back</h1>
           <p class="auth-subtitle">Sign in to access your ZED Academy learning & management portal</p>
@@ -62,7 +57,7 @@
               <label for="login-username">Username</label>
               <div class="input-field-wrap">
                 <i data-lucide="user" class="input-icon"></i>
-                <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username" required />
+                <input type="text" id="login-username" placeholder="Enter your username" required />
               </div>
             </div>
 
@@ -70,8 +65,8 @@
               <label for="login-password">Password</label>
               <div class="input-field-wrap">
                 <i data-lucide="lock" class="input-icon"></i>
-                <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" required />
-                <button type="button" class="password-eye-btn" id="toggle-login-pass" aria-label="Show password">
+                <input type="password" id="login-password" placeholder="Enter your password" required />
+                <button type="button" class="password-eye-btn" id="toggle-login-pass">
                   <i data-lucide="eye"></i>
                 </button>
               </div>
@@ -89,14 +84,14 @@
           </div>
         </div>
 
-        <!-- STUDENT SIGN UP FORM (1 Account Per Telegram ID) -->
+        <!-- SIGN UP PANEL -->
         <div id="signup-panel" style="display: none;">
           <h1 class="auth-title">Student Registration</h1>
-          <p class="auth-subtitle">Create your personal student account linked to your Telegram ID</p>
+          <p class="auth-subtitle">Register your personal student account (1 account per Telegram user)</p>
 
           <div class="tg-verify-banner" id="tg-id-banner">
             <i data-lucide="shield-check" class="icon-sm"></i>
-            <span id="tg-id-status-text">Checking Telegram verification...</span>
+            <span id="tg-id-status-text">Checking Telegram ID...</span>
           </div>
 
           <form id="register-form" class="form-stack">
@@ -104,7 +99,7 @@
               <label for="reg-fullname">Full Name</label>
               <div class="input-field-wrap">
                 <i data-lucide="badge-check" class="input-icon"></i>
-                <input type="text" id="reg-fullname" placeholder="e.g., Sardor Aliyev" required />
+                <input type="text" id="reg-fullname" placeholder="Your Full Name" required />
               </div>
             </div>
 
@@ -127,19 +122,19 @@
             </div>
 
             <div class="input-group">
-              <label for="reg-username">Create Username</label>
+              <label for="reg-username">Username</label>
               <div class="input-field-wrap">
                 <i data-lucide="at-sign" class="input-icon"></i>
-                <input type="text" id="reg-username" placeholder="Choose a unique username" autocomplete="username" required />
+                <input type="text" id="reg-username" placeholder="Create username" required />
               </div>
             </div>
 
             <div class="input-group">
-              <label for="reg-password">Create Password</label>
+              <label for="reg-password">Password</label>
               <div class="input-field-wrap">
                 <i data-lucide="lock-keyhole" class="input-icon"></i>
-                <input type="password" id="reg-password" placeholder="Create a strong password" autocomplete="new-password" required />
-                <button type="button" class="password-eye-btn" id="toggle-reg-pass" aria-label="Show password">
+                <input type="password" id="reg-password" placeholder="Create password" required />
+                <button type="button" class="password-eye-btn" id="toggle-reg-pass">
                   <i data-lucide="eye"></i>
                 </button>
               </div>
@@ -152,27 +147,26 @@
           </form>
 
           <div class="auth-footer-switch">
-            <span>Already have an account?</span>
+            <span>Already registered?</span>
             <button type="button" class="link-btn" id="go-to-signin">Sign In Here</button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ==================== MAIN PORTAL VIEW ==================== -->
+    <!-- ==================== PORTAL VIEW ==================== -->
     <section id="portal-view" class="view-section">
-      <!-- Top User Header (Clickable Profile Card) -->
       <header class="portal-header fade-in-up">
-        <div class="profile-trigger" id="open-profile-modal" role="button" tabindex="0" title="Click to edit your profile & credentials">
+        <div class="profile-trigger" id="open-profile-modal" role="button" tabindex="0" title="Edit Profile">
           <div class="avatar-ring" id="header-avatar">A</div>
           <div class="profile-meta">
             <div class="profile-name-row">
               <h2 id="header-user-name">User Name</h2>
               <i data-lucide="pen-line" class="edit-hint-icon"></i>
             </div>
-            <div class="role-badge" id="header-role-badge">
+            <div class="role-badge">
               <i data-lucide="shield-check" class="icon-xs"></i>
-              <span id="header-role-text">Director / Admin</span>
+              <span id="header-role-text">Role</span>
             </div>
           </div>
         </div>
@@ -182,111 +176,207 @@
             <i data-lucide="moon" class="theme-icon-moon"></i>
             <i data-lucide="sun" class="theme-icon-sun"></i>
           </button>
-          <button type="button" class="logout-pill" id="logout-btn" title="Sign Out">
+          <button type="button" class="logout-pill" id="logout-btn" title="Logout">
             <span>Logout</span>
             <i data-lucide="log-out" class="icon-sm"></i>
           </button>
         </div>
       </header>
 
-      <!-- Navigation Tabs -->
       <nav class="nav-tabs fade-in-up" id="role-nav-tabs"></nav>
-
-      <!-- Dynamic Tab Content Container -->
       <main id="tab-content-area" class="tab-content-area"></main>
     </section>
   </div>
 
-  <!-- ==================== ACCOUNT SETTINGS MODAL ==================== -->
+  <!-- ==================== 1. OWN ACCOUNT SETTINGS MODAL ==================== -->
   <div class="modal-backdrop" id="profile-modal">
     <div class="modal-sheet">
       <div class="modal-header">
         <div class="modal-title-group">
-          <div class="modal-icon-badge">
-            <i data-lucide="user-cog" class="icon-md"></i>
-          </div>
+          <div class="modal-icon-badge"><i data-lucide="user-cog" class="icon-md"></i></div>
           <div>
             <h3>Account Settings</h3>
-            <p class="modal-subtitle">Update your personal info, username & password</p>
+            <p class="modal-subtitle">Update your personal info, login & password</p>
           </div>
         </div>
-        <button type="button" class="icon-btn modal-close" id="close-profile-modal">
-          <i data-lucide="x"></i>
-        </button>
+        <button type="button" class="icon-btn modal-close" id="close-profile-modal"><i data-lucide="x"></i></button>
       </div>
 
       <form id="profile-edit-form" class="form-stack">
         <div class="input-group">
-          <label for="prof-fullname">Full Name</label>
+          <label>Full Name</label>
           <div class="input-field-wrap">
             <i data-lucide="badge-check" class="input-icon"></i>
-            <input type="text" id="prof-fullname" placeholder="Your full name" required />
+            <input type="text" id="prof-fullname" required />
           </div>
         </div>
-
         <div class="input-group">
-          <label for="prof-phone">Phone Number</label>
+          <label>Phone Number</label>
           <div class="input-field-wrap">
             <i data-lucide="phone" class="input-icon"></i>
-            <input type="text" id="prof-phone" placeholder="+998 90 123 45 67" />
+            <input type="text" id="prof-phone" />
           </div>
         </div>
-
         <div class="input-group">
-          <label for="prof-username">Login Username</label>
+          <label>Login Username</label>
           <div class="input-field-wrap">
             <i data-lucide="at-sign" class="input-icon"></i>
-            <input type="text" id="prof-username" placeholder="New username" required />
+            <input type="text" id="prof-username" required />
           </div>
         </div>
-
-        <div class="divider-line">
-          <span>Security & Password</span>
-        </div>
-
+        <div class="divider-line"><span>Change Password</span></div>
         <div class="input-group">
-          <label for="prof-current-pass">Current Password <small>(only if changing password)</small></label>
+          <label>Current Password <small>(only if changing)</small></label>
           <div class="input-field-wrap">
             <i data-lucide="key-round" class="input-icon"></i>
-            <input type="password" id="prof-current-pass" placeholder="Enter current password" />
+            <input type="password" id="prof-current-pass" placeholder="Current password" />
           </div>
         </div>
-
         <div class="input-group">
-          <label for="prof-new-pass">New Password <small>(leave blank to keep current)</small></label>
+          <label>New Password <small>(leave blank to keep)</small></label>
           <div class="input-field-wrap">
             <i data-lucide="lock-keyhole" class="input-icon"></i>
-            <input type="password" id="prof-new-pass" placeholder="Enter new password" />
+            <input type="password" id="prof-new-pass" placeholder="New password" />
           </div>
         </div>
-
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" id="cancel-profile-btn">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="save-profile-btn">
-            <i data-lucide="check" class="icon-sm"></i>
-            <span>Save Changes</span>
-          </button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="check" class="icon-sm"></i><span>Save Changes</span></button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- ==================== RECEIPT PREVIEW MODAL ==================== -->
+  <!-- ==================== 2. EDIT GROUP MODAL (ADMIN) ==================== -->
+  <div class="modal-backdrop" id="edit-group-modal">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-icon-badge"><i data-lucide="layers" class="icon-md"></i></div>
+          <div>
+            <h3>Edit Study Group</h3>
+            <p class="modal-subtitle">Modify group details, schedule or instructor</p>
+          </div>
+        </div>
+        <button type="button" class="icon-btn modal-close" id="close-edit-group-modal"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="edit-group-form" class="form-stack">
+        <input type="hidden" id="edit-grp-id" />
+        <div class="input-group">
+          <label>Group Name</label>
+          <div class="input-field-wrap">
+            <i data-lucide="bookmark" class="input-icon"></i>
+            <input type="text" id="edit-grp-name" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Course Level</label>
+          <div class="input-field-wrap">
+            <i data-lucide="award" class="input-icon"></i>
+            <input type="text" id="edit-grp-level" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Instructor</label>
+          <div class="input-field-wrap">
+            <i data-lucide="user-check" class="input-icon"></i>
+            <select id="edit-grp-teacher"></select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Schedule</label>
+          <div class="input-field-wrap">
+            <i data-lucide="calendar" class="input-icon"></i>
+            <input type="text" id="edit-grp-schedule" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Monthly Tuition Fee (UZS)</label>
+          <div class="input-field-wrap">
+            <i data-lucide="banknote" class="input-icon"></i>
+            <input type="number" id="edit-grp-fee" required />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="cancel-edit-group-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="check" class="icon-sm"></i><span>Update Group</span></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== 3. EDIT STUDENT / ASSIGN GROUP MODAL (ADMIN) ==================== -->
+  <div class="modal-backdrop" id="edit-student-modal">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-icon-badge"><i data-lucide="users" class="icon-md"></i></div>
+          <div>
+            <h3>Manage Student</h3>
+            <p class="modal-subtitle">Assign group or update student credentials</p>
+          </div>
+        </div>
+        <button type="button" class="icon-btn modal-close" id="close-edit-student-modal"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="edit-student-form" class="form-stack">
+        <input type="hidden" id="edit-stu-id" />
+        <div class="input-group">
+          <label>Student Full Name</label>
+          <div class="input-field-wrap">
+            <i data-lucide="user" class="input-icon"></i>
+            <input type="text" id="edit-stu-name" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Assigned Group</label>
+          <div class="input-field-wrap">
+            <i data-lucide="layers" class="input-icon"></i>
+            <select id="edit-stu-group"></select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Phone Number</label>
+          <div class="input-field-wrap">
+            <i data-lucide="phone" class="input-icon"></i>
+            <input type="text" id="edit-stu-phone" />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Login Username</label>
+          <div class="input-field-wrap">
+            <i data-lucide="at-sign" class="input-icon"></i>
+            <input type="text" id="edit-stu-username" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>New Password <small>(leave blank to keep current)</small></label>
+          <div class="input-field-wrap">
+            <i data-lucide="lock" class="input-icon"></i>
+            <input type="text" id="edit-stu-pass" placeholder="Enter new password if resetting" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="cancel-edit-student-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="check" class="icon-sm"></i><span>Save Student</span></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== 4. RECEIPT PREVIEW MODAL ==================== -->
   <div class="modal-backdrop" id="receipt-modal">
     <div class="modal-sheet">
       <div class="modal-header">
         <div class="modal-title-group">
-          <div class="modal-icon-badge">
-            <i data-lucide="receipt" class="icon-md"></i>
-          </div>
+          <div class="modal-icon-badge"><i data-lucide="receipt" class="icon-md"></i></div>
           <div>
             <h3>Payment Receipt</h3>
-            <p class="modal-subtitle" id="receipt-modal-meta">Student upload preview</p>
+            <p class="modal-subtitle" id="receipt-modal-meta">Receipt preview</p>
           </div>
         </div>
-        <button type="button" class="icon-btn modal-close" id="close-receipt-modal">
-          <i data-lucide="x"></i>
-        </button>
+        <button type="button" class="icon-btn modal-close" id="close-receipt-modal"><i data-lucide="x"></i></button>
       </div>
       <div class="receipt-preview-box">
         <img id="receipt-preview-img" src="" alt="Receipt Preview" />
@@ -294,9 +384,7 @@
     </div>
   </div>
 
-  <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
-
   <script src="app.js"></script>
 </body>
 </html>
