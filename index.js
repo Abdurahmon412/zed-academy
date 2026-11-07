@@ -17,6 +17,41 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
+// Auto-ensure new columns/tables exist even if SQL wasn't re-run manually
+async function ensureGamificationSchema() {
+  try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS zed_coins INTEGER NOT NULL DEFAULT 0;`);
+    await pool.query(`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS homework_done BOOLEAN NOT NULL DEFAULT FALSE;`);
+    await pool.query(`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS coins_awarded INTEGER NOT NULL DEFAULT 0;`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS daily_quizzes (
+        id SERIAL PRIMARY KEY,
+        question TEXT NOT NULL,
+        option_a VARCHAR(255) NOT NULL,
+        option_b VARCHAR(255) NOT NULL,
+        option_c VARCHAR(255) NOT NULL,
+        correct_option CHAR(1) NOT NULL DEFAULT 'A',
+        reward_coins INTEGER NOT NULL DEFAULT 10,
+        quiz_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS quiz_submissions (
+        id SERIAL PRIMARY KEY,
+        quiz_id INTEGER NOT NULL REFERENCES daily_quizzes(id) ON DELETE CASCADE,
+        student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        selected_option CHAR(1) NOT NULL,
+        is_correct BOOLEAN NOT NULL DEFAULT FALSE,
+        coins_earned INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(quiz_id, student_id)
+      );
+    `);
+  } catch (err) {
+    console.error('Schema check warning:', err.message);
+  }
+}
+ensureGamificationSchema();
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -58,8 +93,8 @@ app.post('/api/register', async (req, res) => {
     }
 
     const insertRes = await pool.query(
-      `INSERT INTO users (full_name, username, password, role, phone, group_id, telegram_id)
-       VALUES ($1, $2, $3, 'student', $4, $5, $6)
+      `INSERT INTO users (full_name, username, password, role, phone, group_id, telegram_id, zed_coins)
+       VALUES ($1, $2, $3, 'student', $4, $5, $6, 0)
        RETURNING id`,
       [
         full_name.trim(),
@@ -72,7 +107,7 @@ app.post('/api/register', async (req, res) => {
     );
 
     const newUser = await pool.query(
-      `SELECT u.id, u.full_name, u.username, LOWER(u.role) AS role, u.phone, u.group_id, u.telegram_id,
+      `SELECT u.id, u.full_name, u.username, LOWER(u.role) AS role, u.phone, u.group_id, u.telegram_id, u.zed_coins,
               g.name AS group_name, g.level AS group_level, g.schedule AS group_schedule, g.monthly_fee
        FROM users u
        LEFT JOIN groups g ON u.group_id = g.id
@@ -94,7 +129,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT u.id, u.full_name, u.username, LOWER(u.role) AS role, u.phone, u.group_id, u.telegram_id,
+      `SELECT u.id, u.full_name, u.username, LOWER(u.role) AS role, u.phone, u.group_id, u.telegram_id, u.zed_coins,
               g.name AS group_name, g.level AS group_level, g.schedule AS group_schedule, g.monthly_fee
        FROM users u
        LEFT JOIN groups g ON u.group_id = g.id
@@ -120,7 +155,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Update Own Profile (All Roles)
+// Update Own Profile
 app.put('/api/profile', async (req, res) => {
   try {
     const { id, full_name, username, phone, current_password, new_password } = req.body;
@@ -147,7 +182,7 @@ app.put('/api/profile', async (req, res) => {
     );
 
     const updated = await pool.query(
-      `SELECT u.id, u.full_name, u.username, LOWER(u.role) AS role, u.phone, u.group_id, u.telegram_id,
+      `SELECT u.id, u.full_name, u.username, LOWER(u.role) AS role, u.phone, u.group_id, u.telegram_id, u.zed_coins,
               g.name AS group_name, g.level AS group_level, g.schedule AS group_schedule, g.monthly_fee
        FROM users u LEFT JOIN groups g ON u.group_id = g.id WHERE u.id = $1`,
       [id]
@@ -161,9 +196,9 @@ app.put('/api/profile', async (req, res) => {
 // ================= BOOTSTRAP ALL DATA =================
 app.get('/api/bootstrap', async (req, res) => {
   try {
-    const [uRes, gRes, aRes, hRes, pRes] = await Promise.all([
+    const [uRes, gRes, aRes, hRes, pRes, qRes, qsRes] = await Promise.all([
       pool.query(`
-        SELECT u.id, u.full_name, u.username, LOWER(u.role) AS role, u.phone, u.group_id, u.telegram_id,
+        SELECT u.id, u.full_name, u.username, LOWER(u.role) AS role, u.phone, u.group_id, u.telegram_id, u.zed_coins,
                g.name AS group_name
         FROM users u
         LEFT JOIN groups g ON u.group_id = g.id
@@ -198,6 +233,17 @@ app.get('/api/bootstrap', async (req, res) => {
         LEFT JOIN users u ON p.student_id = u.id
         LEFT JOIN groups g ON u.group_id = g.id
         ORDER BY p.id DESC
+      `),
+      pool.query(`
+        SELECT q.*,
+               (SELECT COUNT(*) FROM quiz_submissions qs WHERE qs.quiz_id = q.id) AS total_answers,
+               (SELECT COUNT(*) FROM quiz_submissions qs WHERE qs.quiz_id = q.id AND qs.is_correct = TRUE) AS correct_answers
+        FROM daily_quizzes q
+        ORDER BY q.id DESC
+        LIMIT 30
+      `),
+      pool.query(`
+        SELECT * FROM quiz_submissions ORDER BY id DESC
       `)
     ]);
 
@@ -206,7 +252,9 @@ app.get('/api/bootstrap', async (req, res) => {
       groups: gRes.rows,
       attendance: aRes.rows,
       homeworks: hRes.rows,
-      payments: pRes.rows
+      payments: pRes.rows,
+      quizzes: qRes.rows,
+      quiz_submissions: qsRes.rows
     });
   } catch (err) {
     console.error('Bootstrap error:', err.message);
@@ -214,7 +262,7 @@ app.get('/api/bootstrap', async (req, res) => {
   }
 });
 
-// ================= GROUPS CRUD (CREATE, UPDATE, DELETE) =================
+// ================= GROUPS CRUD =================
 app.post('/api/groups', async (req, res) => {
   try {
     const { name, level, teacher_id, schedule, monthly_fee } = req.body;
@@ -236,7 +284,6 @@ app.post('/api/groups', async (req, res) => {
   }
 });
 
-// Update Existing Group
 app.put('/api/groups/:id', async (req, res) => {
   try {
     const groupId = parseInt(req.params.id, 10);
@@ -273,7 +320,7 @@ app.delete('/api/groups/:id', async (req, res) => {
   }
 });
 
-// ================= USERS / STUDENTS CRUD (CREATE, UPDATE/ASSIGN GROUP, DELETE) =================
+// ================= USERS / STUDENTS CRUD =================
 app.post('/api/users', async (req, res) => {
   try {
     const { full_name, username, password, role, phone, group_id } = req.body;
@@ -281,8 +328,8 @@ app.post('/api/users', async (req, res) => {
       return res.status(400).json({ error: 'Full name, username, and password are required.' });
     }
     const result = await pool.query(
-      `INSERT INTO users (full_name, username, password, role, phone, group_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      `INSERT INTO users (full_name, username, password, role, phone, group_id, zed_coins)
+       VALUES ($1, $2, $3, $4, $5, $6, 0) RETURNING *`,
       [
         full_name.trim(),
         username.trim(),
@@ -299,27 +346,28 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-// Admin Update Student / Teacher (Assign Group, Edit Name, Phone, Username, or Reset Password)
 app.put('/api/users/:id', async (req, res) => {
   try {
     const userId = parseInt(req.params.id, 10);
-    const { full_name, username, phone, group_id, password } = req.body;
+    const { full_name, username, phone, group_id, password, zed_coins } = req.body;
 
     const existing = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
     if (existing.rows.length === 0) return res.status(404).json({ error: 'User not found.' });
 
     const finalPass = password && password.trim() !== '' ? password.trim() : existing.rows[0].password;
+    const finalCoins = zed_coins !== undefined && zed_coins !== '' ? parseInt(zed_coins, 10) : existing.rows[0].zed_coins;
 
     const result = await pool.query(
       `UPDATE users
-       SET full_name = $1, username = $2, phone = $3, group_id = $4, password = $5
-       WHERE id = $6 RETURNING *`,
+       SET full_name = $1, username = $2, phone = $3, group_id = $4, password = $5, zed_coins = $6
+       WHERE id = $7 RETURNING *`,
       [
         full_name.trim(),
         username.trim(),
         (phone || '').trim(),
         group_id ? parseInt(group_id, 10) : null,
         finalPass,
+        finalCoins,
         userId
       ]
     );
@@ -339,23 +387,149 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// ================= ATTENDANCE, HOMEWORKS & PAYMENTS =================
+// ================= ATTENDANCE + HOMEWORK CHECK + ZED COINS =================
 app.post('/api/attendance', async (req, res) => {
   const client = await pool.connect();
   try {
     const { group_id, date, records } = req.body;
-    await client.query('BEGIN');
-    for (const rec of records) {
-      await client.query(
-        `INSERT INTO attendance (student_id, group_id, date, status)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (student_id, group_id, date)
-         DO UPDATE SET status = EXCLUDED.status`,
-        [parseInt(rec.student_id, 10), parseInt(group_id, 10), date, rec.status]
-      );
+    if (!group_id || !Array.isArray(records)) {
+      return res.status(400).json({ error: 'Invalid attendance data.' });
     }
+    const targetGroupId = parseInt(group_id, 10);
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    await client.query('BEGIN');
+
+    for (const rec of records) {
+      const studentId = parseInt(rec.student_id, 10);
+      const status = rec.status || 'present';
+      const hwDone = Boolean(rec.homework_done);
+      const newCoins = hwDone ? Math.max(0, parseInt(rec.coins_awarded, 10) || 0) : 0;
+
+      // Check if attendance was already marked for this student on this date to prevent duplicate coins
+      const prevRes = await client.query(
+        `SELECT coins_awarded FROM attendance WHERE student_id = $1 AND group_id = $2 AND date = $3`,
+        [studentId, targetGroupId, targetDate]
+      );
+      const prevCoins = prevRes.rows.length > 0 ? (parseInt(prevRes.rows[0].coins_awarded, 10) || 0) : 0;
+      const coinDiff = newCoins - prevCoins;
+
+      await client.query(
+        `INSERT INTO attendance (student_id, group_id, date, status, homework_done, coins_awarded)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (student_id, group_id, date)
+         DO UPDATE SET
+           status = EXCLUDED.status,
+           homework_done = EXCLUDED.homework_done,
+           coins_awarded = EXCLUDED.coins_awarded`,
+        [studentId, targetGroupId, targetDate, status, hwDone, newCoins]
+      );
+
+      if (coinDiff !== 0) {
+        await client.query(
+          `UPDATE users SET zed_coins = GREATEST(0, COALESCE(zed_coins, 0) + $1) WHERE id = $2`,
+          [coinDiff, studentId]
+        );
+      }
+    }
+
     await client.query('COMMIT');
     res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Attendance & Coin error:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ================= DAILY QUIZ (ADMIN CREATE & STUDENT SUBMIT) =================
+app.post('/api/quizzes', async (req, res) => {
+  try {
+    const { question, option_a, option_b, option_c, correct_option, reward_coins } = req.body;
+    if (!question || !option_a || !option_b || !option_c) {
+      return res.status(400).json({ error: 'Question and all 3 options (A, B, C) are required.' });
+    }
+    const cleanCorrect = String(correct_option || 'A').toUpperCase().trim();
+    const coins = parseInt(reward_coins, 10) || 10;
+
+    const result = await pool.query(
+      `INSERT INTO daily_quizzes (question, option_a, option_b, option_c, correct_option, reward_coins)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [question.trim(), option_a.trim(), option_b.trim(), option_c.trim(), cleanCorrect, coins]
+    );
+    res.json({ quiz: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/quizzes/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM daily_quizzes WHERE id = $1', [parseInt(req.params.id, 10)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/quizzes/:id/answer', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const quizId = parseInt(req.params.id, 10);
+    const { student_id, selected_option } = req.body;
+    const studentId = parseInt(student_id, 10);
+    const chosen = String(selected_option || '').toUpperCase().trim();
+
+    if (!studentId || !['A', 'B', 'C'].includes(chosen)) {
+      return res.status(400).json({ error: 'Please select a valid option (A, B, or C).' });
+    }
+
+    await client.query('BEGIN');
+
+    // Check if student already answered this quiz
+    const existing = await client.query(
+      'SELECT id FROM quiz_submissions WHERE quiz_id = $1 AND student_id = $2',
+      [quizId, studentId]
+    );
+    if (existing.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'You have already answered this quiz!' });
+    }
+
+    const quizRes = await client.query('SELECT * FROM daily_quizzes WHERE id = $1', [quizId]);
+    if (quizRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Quiz not found.' });
+    }
+
+    const quiz = quizRes.rows[0];
+    const isCorrect = chosen === String(quiz.correct_option).toUpperCase().trim();
+    const earnedCoins = isCorrect ? (parseInt(quiz.reward_coins, 10) || 10) : 0;
+
+    await client.query(
+      `INSERT INTO quiz_submissions (quiz_id, student_id, selected_option, is_correct, coins_earned)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [quizId, studentId, chosen, isCorrect, earnedCoins]
+    );
+
+    if (earnedCoins > 0) {
+      await client.query(
+        `UPDATE users SET zed_coins = COALESCE(zed_coins, 0) + $1 WHERE id = $2`,
+        [earnedCoins, studentId]
+      );
+    }
+
+    const userRes = await client.query('SELECT zed_coins FROM users WHERE id = $1', [studentId]);
+
+    await client.query('COMMIT');
+    res.json({
+      is_correct: isCorrect,
+      correct_option: quiz.correct_option,
+      coins_earned: earnedCoins,
+      total_coins: userRes.rows[0]?.zed_coins || 0
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
@@ -364,6 +538,7 @@ app.post('/api/attendance', async (req, res) => {
   }
 });
 
+// ================= HOMEWORKS & PAYMENTS =================
 app.post('/api/homeworks', async (req, res) => {
   try {
     const { group_id, teacher_id, title, description, due_date } = req.body;
@@ -402,7 +577,6 @@ app.post('/api/payments', async (req, res) => {
     );
     res.json({ success: true, payment: result.rows[0] });
   } catch (err) {
-    console.error('Payment Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -425,7 +599,7 @@ function startBot(webAppUrl) {
     bot.start((ctx) => {
       const firstName = ctx.from?.first_name || 'Student';
       ctx.reply(
-        `Welcome to ZED Academy, ${firstName}!\n\nTap below to open your learning portal:`,
+        `Welcome to ZED Academy, ${firstName}!\n\nTap below to open your learning portal, earn ZED Coins, and check your classes:`,
         Markup.inlineKeyboard([[Markup.button.webApp('Open ZED Academy Portal', webAppUrl)]])
       );
     });
