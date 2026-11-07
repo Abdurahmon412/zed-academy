@@ -32,7 +32,9 @@ const state = {
   payments: [],
   quizzes: [],
   quiz_submissions: [],
-  attendanceDraft: {}
+  attendanceDraft: {},
+  studentSearchQuery: '',
+  studentGroupFilter: 'all'
 };
 
 let countdownInterval = null;
@@ -96,7 +98,7 @@ function computeNextLessonInfo(scheduleStr) {
   Object.keys(dayMap).forEach((k) => {
     if (lower.includes(k)) targetDays.push(dayMap[k]);
   });
-  if (targetDays.length === 0) targetDays = [1, 3, 5]; // Default Mon-Wed-Fri
+  if (targetDays.length === 0) targetDays = [1, 3, 5];
 
   const timeMatch = scheduleStr.match(/(\d{1,2}):(\d{2})/);
   const hour = timeMatch ? parseInt(timeMatch[1], 10) : 15;
@@ -219,11 +221,13 @@ function updateHeaderUI() {
 
   const coinPill = document.getElementById('header-coin-pill');
   const coinCount = document.getElementById('header-coin-count');
-  if (role === 'student') {
-    coinPill.style.display = 'inline-flex';
-    coinCount.textContent = `${state.user.zed_coins || 0} ZED`;
-  } else {
-    coinPill.style.display = 'none';
+  if (coinPill && coinCount) {
+    if (role === 'student') {
+      coinPill.style.display = 'inline-flex';
+      coinCount.textContent = `${state.user.zed_coins || 0} ZED`;
+    } else {
+      coinPill.style.display = 'none';
+    }
   }
 }
 
@@ -465,7 +469,6 @@ function renderActiveTab() {
 // ==================== ADMIN: OVERVIEW ====================
 function renderAdminDashboard(container) {
   const students = state.users.filter((u) => u.role === 'student');
-  const teachers = state.users.filter((u) => u.role === 'teacher');
   const pendingPayments = state.payments.filter((p) => p.status === 'pending');
 
   container.innerHTML = `
@@ -833,49 +836,129 @@ window.deleteGroup = async (id) => {
   }
 };
 
-// ==================== ADMIN: STUDENTS ====================
+// ==================== ADMIN: STUDENTS (WITH LIVE SEARCH & GROUP FILTER) ====================
+function getFilteredStudentsList() {
+  const allStudents = state.users.filter((u) => u.role === 'student');
+  const q = (state.studentSearchQuery || '').trim().toLowerCase();
+  const grpFilter = state.studentGroupFilter || 'all';
+
+  return allStudents.filter((s) => {
+    // Group filter check
+    if (grpFilter === 'unassigned' && s.group_id) return false;
+    if (grpFilter !== 'all' && grpFilter !== 'unassigned' && String(s.group_id) !== String(grpFilter)) {
+      return false;
+    }
+
+    // Search query check (name, username, phone, group name, telegram_id)
+    if (!q) return true;
+    const matchName = (s.full_name || '').toLowerCase().includes(q);
+    const matchUser = (s.username || '').toLowerCase().includes(q);
+    const matchPhone = (s.phone || '').toLowerCase().includes(q);
+    const matchGroup = (s.group_name || '').toLowerCase().includes(q);
+    const matchTg = String(s.telegram_id || '').toLowerCase().includes(q);
+
+    return matchName || matchUser || matchPhone || matchGroup || matchTg;
+  });
+}
+
+function renderStudentRowsHTML() {
+  const allStudents = state.users.filter((u) => u.role === 'student');
+  const filtered = getFilteredStudentsList();
+
+  const countBadge = document.getElementById('students-Filter-Count');
+  if (countBadge) {
+    countBadge.textContent =
+      filtered.length === allStudents.length
+        ? `${allStudents.length} Students`
+        : `Showing ${filtered.length} of ${allStudents.length}`;
+  }
+
+  if (filtered.length === 0) {
+    return `<p class="row-sub" style="padding:12px 4px;">No matching students found. Try clearing the search filter.</p>`;
+  }
+
+  return filtered
+    .map(
+      (s) => `
+      <div class="list-row">
+        <div class="row-main">
+          <h4>${s.full_name} <span class="badge badge-gold">💎 ${s.zed_coins || 0} ZED</span></h4>
+          <div class="row-sub">
+            <span>@${s.username}</span>
+            <span class="badge ${s.group_id ? 'badge-info' : 'badge-warning'}">
+              ${s.group_name ? `Group: ${s.group_name}` : 'No Group Assigned'}
+            </span>
+            <span>• ${s.phone || 'No phone'}</span>
+            ${s.telegram_id ? `<span class="badge badge-success">TG #${s.telegram_id}</span>` : ''}
+          </div>
+        </div>
+        <div class="att-controls">
+          <button class="btn btn-ghost" style="padding:8px 11px;" onclick="openEditStudentModal(${s.id})" title="Edit Student / Group / Coins">
+            <i data-lucide="pencil" class="icon-xs"></i>
+          </button>
+          <button class="btn btn-danger-soft" onclick="deleteUserAccount(${s.id})">
+            <i data-lucide="trash-2" class="icon-xs"></i>
+          </button>
+        </div>
+      </div>
+    `
+    )
+    .join('');
+}
+
+function updateStudentsListDOM() {
+  const listContainer = document.getElementById('admin-students-list-container');
+  if (listContainer) {
+    listContainer.innerHTML = renderStudentRowsHTML();
+    refreshIcons();
+  }
+}
+
 function renderAdminStudents(container) {
-  const students = state.users.filter((u) => u.role === 'student');
+  const allStudents = state.users.filter((u) => u.role === 'student');
 
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="users" class="icon-sm"></i><span>Registered Students (${students.length})</span></div>
+        <div class="section-title">
+          <i data-lucide="users" class="icon-sm"></i>
+          <span>Registered Students</span>
+          <span class="badge badge-info" id="students-Filter-Count">${allStudents.length} Students</span>
+        </div>
         <button class="btn btn-ghost" onclick="loadBootstrapData()" style="padding:6px 10px; font-size:0.78rem;">
           <i data-lucide="refresh-cw" class="icon-xs"></i><span>Refresh</span>
         </button>
       </div>
-      <div class="item-list">
-        ${
-          students.length === 0
-            ? `<p class="row-sub">No students registered yet.</p>`
-            : students
-                .map(
-                  (s) => `
-              <div class="list-row">
-                <div class="row-main">
-                  <h4>${s.full_name} <span class="badge badge-gold">💎 ${s.zed_coins || 0} ZED</span></h4>
-                  <div class="row-sub">
-                    <span>@${s.username}</span>
-                    <span class="badge ${s.group_id ? 'badge-info' : 'badge-warning'}">
-                      ${s.group_name ? `Group: ${s.group_name}` : 'No Group Assigned'}
-                    </span>
-                    <span>• ${s.phone || 'No phone'}</span>
-                  </div>
-                </div>
-                <div class="att-controls">
-                  <button class="btn btn-ghost" style="padding:8px 11px;" onclick="openEditStudentModal(${s.id})" title="Edit Student / Group / Coins">
-                    <i data-lucide="pencil" class="icon-xs"></i>
-                  </button>
-                  <button class="btn btn-danger-soft" onclick="deleteUserAccount(${s.id})">
-                    <i data-lucide="trash-2" class="icon-xs"></i>
-                  </button>
-                </div>
-              </div>
-            `
-                )
-                .join('')
-        }
+
+      <!-- SEARCH & GROUP FILTER BAR -->
+      <div class="form-stack" style="margin-bottom: 16px;">
+        <div class="input-field-wrap">
+          <i data-lucide="search" class="input-icon"></i>
+          <input
+            type="text"
+            id="student-search-input"
+            placeholder="Search by student name, @username, phone or group..."
+            value="${state.studentSearchQuery}"
+            autocomplete="off"
+          />
+        </div>
+        <div class="input-field-wrap">
+          <i data-lucide="filter" class="input-icon"></i>
+          <select id="student-group-filter">
+            <option value="all" ${state.studentGroupFilter === 'all' ? 'selected' : ''}>All Study Groups (${allStudents.length})</option>
+            <option value="unassigned" ${state.studentGroupFilter === 'unassigned' ? 'selected' : ''}>Unassigned Students Only</option>
+            ${state.groups
+              .map(
+                (g) =>
+                  `<option value="${g.id}" ${String(state.studentGroupFilter) === String(g.id) ? 'selected' : ''}>Group: ${g.name} (${g.level})</option>`
+              )
+              .join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="item-list" id="admin-students-list-container">
+        ${renderStudentRowsHTML()}
       </div>
     </div>
 
@@ -925,6 +1008,18 @@ function renderAdminStudents(container) {
       </form>
     </div>
   `;
+
+  // Live Search Input Listener
+  document.getElementById('student-search-input')?.addEventListener('input', (e) => {
+    state.studentSearchQuery = e.target.value;
+    updateStudentsListDOM();
+  });
+
+  // Group Filter Listener
+  document.getElementById('student-group-filter')?.addEventListener('change', (e) => {
+    state.studentGroupFilter = e.target.value;
+    updateStudentsListDOM();
+  });
 
   document.getElementById('add-student-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1167,7 +1262,7 @@ window.updatePaymentStatus = async (id, status) => {
   }
 };
 
-// ==================== TEACHER VIEWS (WITH HOMEWORK CHECK & ZED COIN REWARDS) ====================
+// ==================== TEACHER VIEWS ====================
 function renderTeacherDashboard(container) {
   const myGroups = state.groups.filter((g) => g.teacher_id === state.user.id);
   const groupsToShow = myGroups.length > 0 ? myGroups : state.groups;
@@ -1457,7 +1552,7 @@ window.deleteHw = async (id) => {
   }
 };
 
-// ==================== STUDENT DASHBOARD (ZED COINS + NEXT LESSON + DAILY QUIZ) ====================
+// ==================== STUDENT DASHBOARD ====================
 function renderStudentDashboard(container) {
   const myAtt = state.attendance.filter((a) => a.student_id === state.user.id);
   const presentCount = myAtt.filter((a) => a.status === 'present' || a.status === 'late').length;
@@ -1465,17 +1560,14 @@ function renderStudentDashboard(container) {
   const myGroup = state.groups.find((g) => g.id === state.user.group_id);
   const myCoins = state.user.zed_coins || 0;
 
-  // Next Lesson Computation
   const nextInfo = computeNextLessonInfo(myGroup?.schedule || 'Mon-Wed-Fri • 15:00');
 
-  // Latest Daily Quiz
   const latestQuiz = state.quizzes[0] || null;
   const mySubmission = latestQuiz
     ? state.quiz_submissions.find((qs) => qs.quiz_id === latestQuiz.id && qs.student_id === state.user.id)
     : null;
 
   container.innerHTML = `
-    <!-- 1. TOP ZED COINS WALLET HERO -->
     <div class="zed-coin-hero fade-in-up">
       <div class="coin-hero-left">
         <div class="coin-tag">
@@ -1496,7 +1588,6 @@ function renderStudentDashboard(container) {
       </div>
     </div>
 
-    <!-- 2. NEXT LESSON BANNER -->
     <div class="next-lesson-card fade-in-up">
       <div class="next-lesson-info">
         <div class="next-lesson-label">
@@ -1515,7 +1606,6 @@ function renderStudentDashboard(container) {
       </div>
     </div>
 
-    <!-- 3. DAILY QUIZ CHALLENGE (+10 ZED COINS) -->
     <div class="quiz-card fade-in-up">
       <div class="section-header">
         <div class="section-title">
@@ -1562,7 +1652,6 @@ function renderStudentDashboard(container) {
       }
     </div>
 
-    <!-- 4. GROUP & ATTENDANCE STATS -->
     <div class="stats-grid fade-in-up">
       <div class="stat-card">
         <div>
@@ -1592,7 +1681,6 @@ function renderStudentDashboard(container) {
       </div>
     </div>
 
-    <!-- 5. ATTENDANCE & HOMEWORK COIN HISTORY -->
     <div class="card-panel fade-in-up">
       <div class="section-header">
         <div class="section-title"><i data-lucide="calendar-days" class="icon-sm"></i><span>Attendance & Homework Log</span></div>
