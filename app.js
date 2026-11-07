@@ -6,16 +6,13 @@ if (tg) {
 
 function getTelegramUserId() {
   const tgUser = tg?.initDataUnsafe?.user;
-  if (tgUser && tgUser.id) {
-    return String(tgUser.id);
-  }
-  return null;
+  return tgUser && tgUser.id ? String(tgUser.id) : null;
 }
 
 function triggerHaptic(type = 'light') {
   try {
     if (tg?.HapticFeedback) {
-      if (type === 'success' || type === 'error' || type === 'warning') {
+      if (['success', 'error', 'warning'].includes(type)) {
         tg.HapticFeedback.notificationOccurred(type);
       } else {
         tg.HapticFeedback.impactOccurred(type);
@@ -56,9 +53,7 @@ function toggleTheme() {
 }
 
 function refreshIcons() {
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
+  if (window.lucide) window.lucide.createIcons();
 }
 
 function showToast(message, type = 'info') {
@@ -80,13 +75,11 @@ async function apiRequest(url, options = {}) {
     ...options
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.error || 'Server error occurred');
-  }
+  if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
 
-// ==================== AUTH CONTROLS ====================
+// ==================== AUTH MODE SWITCH ====================
 const signinPanel = document.getElementById('signin-panel');
 const signupPanel = document.getElementById('signup-panel');
 const tabSigninBtn = document.getElementById('tab-signin-btn');
@@ -113,14 +106,14 @@ function updateTelegramBanner() {
   if (banner && textEl) {
     if (tgId) {
       banner.classList.remove('warning');
-      textEl.textContent = `Telegram ID Verified: #${tgId} (1 account limit active)`;
+      textEl.textContent = `Telegram ID Verified: #${tgId}`;
       const fullNameInput = document.getElementById('reg-fullname');
       if (fullNameInput && !fullNameInput.value && tgUser) {
         fullNameInput.value = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
       }
     } else {
       banner.classList.add('warning');
-      textEl.textContent = 'Please open inside Telegram Bot to verify your Telegram ID';
+      textEl.textContent = 'Open inside Telegram Bot to verify Telegram ID';
     }
   }
 }
@@ -148,7 +141,7 @@ tabSignupBtn?.addEventListener('click', () => switchAuthMode('signup'));
 document.getElementById('go-to-signup')?.addEventListener('click', () => switchAuthMode('signup'));
 document.getElementById('go-to-signin')?.addEventListener('click', () => switchAuthMode('signin'));
 
-// ==================== APP LIFECYCLE ====================
+// ==================== PORTAL INITIALIZATION ====================
 const authView = document.getElementById('auth-view');
 const portalView = document.getElementById('portal-view');
 
@@ -167,7 +160,7 @@ function updateHeaderUI() {
   document.getElementById('header-role-text').textContent = roleLabels[role] || 'Member';
 }
 
-async function loadBootstrapData() {
+window.loadBootstrapData = async function () {
   try {
     const data = await apiRequest('/api/bootstrap');
     state.users = data.users || [];
@@ -188,7 +181,7 @@ async function loadBootstrapData() {
   } catch (err) {
     showToast(err.message, 'error');
   }
-}
+};
 
 function enterPortal() {
   authView.classList.remove('active');
@@ -219,17 +212,13 @@ document.getElementById('login-form')?.addEventListener('submit', async (e) => {
     btn.disabled = true;
     const { user } = await apiRequest('/api/login', {
       method: 'POST',
-      body: JSON.stringify({
-        username,
-        password,
-        telegram_id: getTelegramUserId()
-      })
+      body: JSON.stringify({ username, password, telegram_id: getTelegramUserId() })
     });
     state.user = user;
     state.activeTab = 'dashboard';
     localStorage.setItem('zed_user', JSON.stringify(user));
     triggerHaptic('success');
-    showToast(`Welcome back, ${user.full_name}!`, 'success');
+    showToast(`Welcome, ${user.full_name}!`, 'success');
     enterPortal();
   } catch (err) {
     triggerHaptic('error');
@@ -239,32 +228,26 @@ document.getElementById('login-form')?.addEventListener('submit', async (e) => {
   }
 });
 
-// Student Self Registration
+// Student Sign Up
 document.getElementById('register-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const tgId = getTelegramUserId();
   if (!tgId) {
     triggerHaptic('error');
-    return showToast('Please open the portal inside Telegram to verify your account.', 'error');
+    return showToast('Please open this portal inside Telegram Bot to register.', 'error');
   }
 
-  const full_name = document.getElementById('reg-fullname').value.trim();
-  const phone = document.getElementById('reg-phone').value.trim();
-  const group_id = document.getElementById('reg-group').value;
-  const username = document.getElementById('reg-username').value.trim();
-  const password = document.getElementById('reg-password').value.trim();
   const btn = document.getElementById('register-submit-btn');
-
   try {
     btn.disabled = true;
     const { user } = await apiRequest('/api/register', {
       method: 'POST',
       body: JSON.stringify({
-        full_name,
-        phone,
-        group_id,
-        username,
-        password,
+        full_name: document.getElementById('reg-fullname').value.trim(),
+        phone: document.getElementById('reg-phone').value.trim(),
+        group_id: document.getElementById('reg-group').value,
+        username: document.getElementById('reg-username').value.trim(),
+        password: document.getElementById('reg-password').value.trim(),
         telegram_id: tgId
       })
     });
@@ -272,7 +255,7 @@ document.getElementById('register-form')?.addEventListener('submit', async (e) =
     state.activeTab = 'dashboard';
     localStorage.setItem('zed_user', JSON.stringify(user));
     triggerHaptic('success');
-    showToast('Registration complete! Welcome to ZED Academy.', 'success');
+    showToast('Account registered! Welcome to ZED Academy.', 'success');
     enterPortal();
   } catch (err) {
     triggerHaptic('error');
@@ -282,19 +265,18 @@ document.getElementById('register-form')?.addEventListener('submit', async (e) =
   }
 });
 
-// Pass Toggles
 document.getElementById('toggle-login-pass')?.addEventListener('click', () => {
-  const input = document.getElementById('login-password');
-  input.type = input.type === 'password' ? 'text' : 'password';
+  const inp = document.getElementById('login-password');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
 });
 document.getElementById('toggle-reg-pass')?.addEventListener('click', () => {
-  const input = document.getElementById('reg-password');
-  input.type = input.type === 'password' ? 'text' : 'password';
+  const inp = document.getElementById('reg-password');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
 });
 
-// Account Settings Modal
+// ==================== OWN PROFILE MODAL ====================
 const profileModal = document.getElementById('profile-modal');
-function openProfileModal() {
+document.getElementById('open-profile-modal')?.addEventListener('click', () => {
   if (!state.user) return;
   triggerHaptic('light');
   document.getElementById('prof-fullname').value = state.user.full_name || '';
@@ -304,46 +286,37 @@ function openProfileModal() {
   document.getElementById('prof-new-pass').value = '';
   profileModal.classList.add('open');
   refreshIcons();
-}
-function closeProfileModal() {
-  profileModal.classList.remove('open');
-}
-document.getElementById('open-profile-modal')?.addEventListener('click', openProfileModal);
-document.getElementById('close-profile-modal')?.addEventListener('click', closeProfileModal);
-document.getElementById('cancel-profile-btn')?.addEventListener('click', closeProfileModal);
+});
+document.getElementById('close-profile-modal')?.addEventListener('click', () => profileModal.classList.remove('open'));
+document.getElementById('cancel-profile-btn')?.addEventListener('click', () => profileModal.classList.remove('open'));
 
 document.getElementById('profile-edit-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!state.user) return;
-
-  const payload = {
-    id: state.user.id,
-    full_name: document.getElementById('prof-fullname').value.trim(),
-    phone: document.getElementById('prof-phone').value.trim(),
-    username: document.getElementById('prof-username').value.trim(),
-    current_password: document.getElementById('prof-current-pass').value,
-    new_password: document.getElementById('prof-new-pass').value
-  };
-
   try {
     const res = await apiRequest('/api/profile', {
       method: 'PUT',
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        id: state.user.id,
+        full_name: document.getElementById('prof-fullname').value.trim(),
+        phone: document.getElementById('prof-phone').value.trim(),
+        username: document.getElementById('prof-username').value.trim(),
+        current_password: document.getElementById('prof-current-pass').value,
+        new_password: document.getElementById('prof-new-pass').value
+      })
     });
     state.user = res.user;
     localStorage.setItem('zed_user', JSON.stringify(state.user));
     updateHeaderUI();
-    closeProfileModal();
+    profileModal.classList.remove('open');
     triggerHaptic('success');
-    showToast('Account settings updated!', 'success');
+    showToast('Profile updated!', 'success');
     loadBootstrapData();
   } catch (err) {
-    triggerHaptic('error');
     showToast(err.message, 'error');
   }
 });
 
-// Navigation Tabs
+// ==================== NAVIGATION TABS ====================
 function getTabsForRole(role) {
   const r = (role || 'student').toLowerCase();
   if (r === 'admin') {
@@ -371,7 +344,7 @@ function getTabsForRole(role) {
 
 function renderNavigationTabs() {
   const nav = document.getElementById('role-nav-tabs');
-  const tabs = getTabsForRole(state.user?.role || 'student');
+  const tabs = getTabsForRole(state.user?.role);
   nav.innerHTML = tabs
     .map(
       (t) => `
@@ -388,7 +361,7 @@ function renderNavigationTabs() {
       triggerHaptic('light');
       state.activeTab = btn.dataset.tab;
       renderNavigationTabs();
-      loadBootstrapData(); // Realtime sync on tab switch
+      loadBootstrapData();
     });
   });
   refreshIcons();
@@ -416,68 +389,59 @@ function renderActiveTab() {
   refreshIcons();
 }
 
-// ---------------- ADMIN VIEWS ----------------
+// ==================== ADMIN: OVERVIEW ====================
 function renderAdminDashboard(container) {
-  const students = state.users.filter((u) => (u.role || '').toLowerCase() === 'student');
-  const teachers = state.users.filter((u) => (u.role || '').toLowerCase() === 'teacher');
+  const students = state.users.filter((u) => u.role === 'student');
+  const teachers = state.users.filter((u) => u.role === 'teacher');
   const pendingPayments = state.payments.filter((p) => p.status === 'pending');
 
   container.innerHTML = `
     <div class="stats-grid fade-in-up">
       <div class="stat-card">
-        <div>
-          <div class="stat-label">Total Students</div>
-          <div class="stat-value">${students.length}</div>
-        </div>
+        <div><div class="stat-label">Total Students</div><div class="stat-value">${students.length}</div></div>
         <div class="stat-icon-box"><i data-lucide="users"></i></div>
       </div>
       <div class="stat-card">
-        <div>
-          <div class="stat-label">Active Groups</div>
-          <div class="stat-value">${state.groups.length}</div>
-        </div>
+        <div><div class="stat-label">Active Groups</div><div class="stat-value">${state.groups.length}</div></div>
         <div class="stat-icon-box"><i data-lucide="layers"></i></div>
       </div>
       <div class="stat-card">
-        <div>
-          <div class="stat-label">Instructors</div>
-          <div class="stat-value">${teachers.length}</div>
-        </div>
+        <div><div class="stat-label">Instructors</div><div class="stat-value">${teachers.length}</div></div>
         <div class="stat-icon-box"><i data-lucide="user-check"></i></div>
       </div>
       <div class="stat-card">
-        <div>
-          <div class="stat-label">Pending Receipts</div>
-          <div class="stat-value">${pendingPayments.length}</div>
-        </div>
+        <div><div class="stat-label">Pending Receipts</div><div class="stat-value">${pendingPayments.length}</div></div>
         <div class="stat-icon-box"><i data-lucide="clock"></i></div>
       </div>
     </div>
 
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="sparkles" class="icon-sm"></i><span>Active Study Groups</span></div>
+        <div class="section-title"><i data-lucide="layers" class="icon-sm"></i><span>Existing Study Groups (${state.groups.length})</span></div>
         <button class="btn btn-ghost" onclick="loadBootstrapData()" style="padding:6px 10px; font-size:0.78rem;">
-          <i data-lucide="refresh-cw" class="icon-xs"></i> <span>Refresh</span>
+          <i data-lucide="refresh-cw" class="icon-xs"></i><span>Refresh</span>
         </button>
       </div>
       <div class="item-list">
         ${
           state.groups.length === 0
-            ? `<p class="row-sub">No groups created yet.</p>`
+            ? `<p class="row-sub">No study groups created yet.</p>`
             : state.groups
                 .map(
                   (g) => `
               <div class="list-row">
                 <div class="row-main">
-                  <h4>${g.name}</h4>
+                  <h4>${g.name} <span class="badge badge-info">${g.level}</span></h4>
                   <div class="row-sub">
-                    <span>Level: ${g.level || 'General'}</span>
-                    <span>• Instructor: ${g.teacher_name || 'Unassigned'}</span>
-                    <span>• ${g.schedule || ''}</span>
+                    <span>Instructor: ${g.teacher_name || 'Unassigned'}</span>
+                    <span>• ${g.schedule}</span>
+                    <span>• ${Number(g.monthly_fee || 0).toLocaleString()} UZS</span>
                   </div>
                 </div>
-                <span class="badge badge-info">${g.student_count || 0} students</span>
+                <div class="att-controls">
+                  <span class="badge badge-success">${g.student_count || 0} students</span>
+                  <button class="btn btn-ghost" style="padding:7px 10px;" onclick="openEditGroupModal(${g.id})" title="Edit Group"><i data-lucide="pencil" class="icon-xs"></i></button>
+                </div>
               </div>
             `
                 )
@@ -488,9 +452,51 @@ function renderAdminDashboard(container) {
   `;
 }
 
+// ==================== ADMIN: GROUPS (VIEW, CREATE, EDIT, DELETE) ====================
 function renderAdminGroups(container) {
-  const teachers = state.users.filter((u) => (u.role || '').toLowerCase() === 'teacher');
+  const teachers = state.users.filter((u) => u.role === 'teacher');
+
   container.innerHTML = `
+    <div class="card-panel fade-in-up">
+      <div class="section-header">
+        <div class="section-title"><i data-lucide="layers" class="icon-sm"></i><span>Existing Groups (${state.groups.length})</span></div>
+        <button class="btn btn-ghost" onclick="loadBootstrapData()" style="padding:6px 10px; font-size:0.78rem;">
+          <i data-lucide="refresh-cw" class="icon-xs"></i><span>Refresh</span>
+        </button>
+      </div>
+      <div class="item-list">
+        ${
+          state.groups.length === 0
+            ? `<p class="row-sub">No groups available. Create one below.</p>`
+            : state.groups
+                .map(
+                  (g) => `
+              <div class="list-row">
+                <div class="row-main">
+                  <h4>${g.name} <span class="badge badge-info">${g.level}</span></h4>
+                  <div class="row-sub">
+                    <span>Teacher: ${g.teacher_name || 'Unassigned'}</span>
+                    <span>• ${g.schedule}</span>
+                    <span>• ${Number(g.monthly_fee || 0).toLocaleString()} UZS</span>
+                    <span>• <b>${g.student_count || 0} students</b></span>
+                  </div>
+                </div>
+                <div class="att-controls">
+                  <button class="btn btn-ghost" style="padding:8px 11px;" onclick="openEditGroupModal(${g.id})" title="Edit Group">
+                    <i data-lucide="pencil" class="icon-xs"></i>
+                  </button>
+                  <button class="btn btn-danger-soft" onclick="deleteGroup(${g.id})" title="Delete Group">
+                    <i data-lucide="trash-2" class="icon-xs"></i>
+                  </button>
+                </div>
+              </div>
+            `
+                )
+                .join('')
+        }
+      </div>
+    </div>
+
     <div class="card-panel fade-in-up">
       <div class="section-header">
         <div class="section-title"><i data-lucide="folder-plus" class="icon-sm"></i><span>Create New Group</span></div>
@@ -500,14 +506,14 @@ function renderAdminGroups(container) {
           <label>Group Name</label>
           <div class="input-field-wrap">
             <i data-lucide="bookmark" class="input-icon"></i>
-            <input type="text" id="grp-name" placeholder="e.g., IELTS Target 7.0" required />
+            <input type="text" id="grp-name" placeholder="e.g., IELTS Intensive B2" required />
           </div>
         </div>
         <div class="input-group">
           <label>Course Level</label>
           <div class="input-field-wrap">
             <i data-lucide="award" class="input-icon"></i>
-            <input type="text" id="grp-level" placeholder="e.g., Pre-Intermediate / IELTS" required />
+            <input type="text" id="grp-level" placeholder="e.g., Upper-Intermediate / IELTS" required />
           </div>
         </div>
         <div class="input-group">
@@ -515,51 +521,27 @@ function renderAdminGroups(container) {
           <div class="input-field-wrap">
             <i data-lucide="user-check" class="input-icon"></i>
             <select id="grp-teacher">
-              <option value="">Select Teacher</option>
+              <option value="">Select Instructor...</option>
               ${teachers.map((t) => `<option value="${t.id}">${t.full_name}</option>`).join('')}
             </select>
           </div>
         </div>
         <div class="input-group">
-          <label>Schedule & Monthly Tuition (UZS)</label>
+          <label>Class Schedule</label>
           <div class="input-field-wrap">
             <i data-lucide="calendar" class="input-icon"></i>
-            <input type="text" id="grp-schedule" placeholder="Mon-Wed-Fri 15:00" value="Mon-Wed-Fri • 15:00" />
+            <input type="text" id="grp-schedule" value="Mon-Wed-Fri • 15:00" required />
           </div>
         </div>
         <div class="input-group">
+          <label>Monthly Tuition Fee (UZS)</label>
           <div class="input-field-wrap">
             <i data-lucide="banknote" class="input-icon"></i>
-            <input type="number" id="grp-fee" placeholder="450000" value="450000" />
+            <input type="number" id="grp-fee" value="450000" required />
           </div>
         </div>
-        <button type="submit" class="btn btn-primary"><i data-lucide="plus" class="icon-sm"></i><span>Add Group</span></button>
+        <button type="submit" class="btn btn-primary"><i data-lucide="plus" class="icon-sm"></i><span>Create Group</span></button>
       </form>
-    </div>
-
-    <div class="card-panel fade-in-up">
-      <div class="section-header">
-        <div class="section-title"><i data-lucide="layers" class="icon-sm"></i><span>All Groups</span></div>
-      </div>
-      <div class="item-list">
-        ${state.groups
-          .map(
-            (g) => `
-          <div class="list-row">
-            <div class="row-main">
-              <h4>${g.name} (${g.level})</h4>
-              <div class="row-sub">
-                <span>Teacher: ${g.teacher_name || 'None'}</span>
-                <span>• ${g.schedule}</span>
-                <span>• ${Number(g.monthly_fee || 0).toLocaleString()} UZS</span>
-              </div>
-            </div>
-            <button class="btn btn-danger-soft" onclick="deleteGroup(${g.id})"><i data-lucide="trash-2" class="icon-xs"></i></button>
-          </div>
-        `
-          )
-          .join('')}
-      </div>
     </div>
   `;
 
@@ -577,7 +559,7 @@ function renderAdminGroups(container) {
         })
       });
       triggerHaptic('success');
-      showToast('Group created!', 'success');
+      showToast('Group created successfully!', 'success');
       loadBootstrapData();
     } catch (err) {
       showToast(err.message, 'error');
@@ -585,26 +567,76 @@ function renderAdminGroups(container) {
   });
 }
 
+// Edit Group Modal Logic
+const editGroupModal = document.getElementById('edit-group-modal');
+window.openEditGroupModal = (groupId) => {
+  const grp = state.groups.find((g) => g.id === groupId);
+  if (!grp) return;
+  triggerHaptic('light');
+
+  const teachers = state.users.filter((u) => u.role === 'teacher');
+  const teacherSelect = document.getElementById('edit-grp-teacher');
+  teacherSelect.innerHTML =
+    `<option value="">Unassigned</option>` +
+    teachers.map((t) => `<option value="${t.id}" ${grp.teacher_id === t.id ? 'selected' : ''}>${t.full_name}</option>`).join('');
+
+  document.getElementById('edit-grp-id').value = grp.id;
+  document.getElementById('edit-grp-name').value = grp.name || '';
+  document.getElementById('edit-grp-level').value = grp.level || '';
+  document.getElementById('edit-grp-schedule').value = grp.schedule || '';
+  document.getElementById('edit-grp-fee').value = grp.monthly_fee || 450000;
+
+  editGroupModal.classList.add('open');
+  refreshIcons();
+};
+
+document.getElementById('close-edit-group-modal')?.addEventListener('click', () => editGroupModal.classList.remove('open'));
+document.getElementById('cancel-edit-group-btn')?.addEventListener('click', () => editGroupModal.classList.remove('open'));
+
+document.getElementById('edit-group-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('edit-grp-id').value;
+  try {
+    await apiRequest(`/api/groups/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: document.getElementById('edit-grp-name').value,
+        level: document.getElementById('edit-grp-level').value,
+        teacher_id: document.getElementById('edit-grp-teacher').value,
+        schedule: document.getElementById('edit-grp-schedule').value,
+        monthly_fee: document.getElementById('edit-grp-fee').value
+      })
+    });
+    editGroupModal.classList.remove('open');
+    triggerHaptic('success');
+    showToast('Group updated successfully!', 'success');
+    loadBootstrapData();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
 window.deleteGroup = async (id) => {
   try {
     await apiRequest(`/api/groups/${id}`, { method: 'DELETE' });
-    showToast('Group removed', 'info');
+    triggerHaptic('warning');
+    showToast('Group deleted', 'info');
     loadBootstrapData();
   } catch (err) {
     showToast(err.message, 'error');
   }
 };
 
+// ==================== ADMIN: STUDENTS (VIEW, ASSIGN/CHANGE GROUP, EDIT, DELETE) ====================
 function renderAdminStudents(container) {
-  // Case-insensitive match to make sure self-registered students always show up
-  const students = state.users.filter((u) => (u.role || '').toLowerCase() === 'student');
+  const students = state.users.filter((u) => u.role === 'student');
 
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
         <div class="section-title"><i data-lucide="users" class="icon-sm"></i><span>Registered Students (${students.length})</span></div>
         <button class="btn btn-ghost" onclick="loadBootstrapData()" style="padding:6px 10px; font-size:0.78rem;">
-          <i data-lucide="refresh-cw" class="icon-xs"></i> <span>Refresh List</span>
+          <i data-lucide="refresh-cw" class="icon-xs"></i><span>Refresh</span>
         </button>
       </div>
       <div class="item-list">
@@ -619,12 +651,21 @@ function renderAdminStudents(container) {
                   <h4>${s.full_name}</h4>
                   <div class="row-sub">
                     <span>@${s.username}</span>
-                    <span>• Group: ${s.group_name || 'Unassigned'}</span>
+                    <span class="badge ${s.group_id ? 'badge-info' : 'badge-warning'}">
+                      ${s.group_name ? `Group: ${s.group_name}` : 'No Group Assigned'}
+                    </span>
                     <span>• ${s.phone || 'No phone'}</span>
-                    ${s.telegram_id ? `<span class="badge badge-info">TG: #${s.telegram_id}</span>` : ''}
+                    ${s.telegram_id ? `<span class="badge badge-success">TG #${s.telegram_id}</span>` : ''}
                   </div>
                 </div>
-                <button class="btn btn-danger-soft" onclick="deleteUserAccount(${s.id})"><i data-lucide="trash-2" class="icon-xs"></i></button>
+                <div class="att-controls">
+                  <button class="btn btn-ghost" style="padding:8px 11px;" onclick="openEditStudentModal(${s.id})" title="Assign Group / Edit Student">
+                    <i data-lucide="pencil" class="icon-xs"></i>
+                  </button>
+                  <button class="btn btn-danger-soft" onclick="deleteUserAccount(${s.id})" title="Remove Student">
+                    <i data-lucide="trash-2" class="icon-xs"></i>
+                  </button>
+                </div>
               </div>
             `
                 )
@@ -635,7 +676,7 @@ function renderAdminStudents(container) {
 
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="user-plus" class="icon-sm"></i><span>Register Student Manually</span></div>
+        <div class="section-title"><i data-lucide="user-plus" class="icon-sm"></i><span>Add New Student & Assign to Group</span></div>
       </div>
       <form id="add-student-form" class="form-stack">
         <div class="input-group">
@@ -643,6 +684,23 @@ function renderAdminStudents(container) {
           <div class="input-field-wrap">
             <i data-lucide="user" class="input-icon"></i>
             <input type="text" id="stu-name" placeholder="Full Name" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Select Study Group</label>
+          <div class="input-field-wrap">
+            <i data-lucide="layers" class="input-icon"></i>
+            <select id="stu-group" required>
+              <option value="">Choose Group...</option>
+              ${state.groups.map((g) => `<option value="${g.id}">${g.name} (${g.level})</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Phone Number</label>
+          <div class="input-field-wrap">
+            <i data-lucide="phone" class="input-icon"></i>
+            <input type="text" id="stu-phone" placeholder="+998 90 123 45 67" />
           </div>
         </div>
         <div class="input-group">
@@ -655,23 +713,7 @@ function renderAdminStudents(container) {
         <div class="input-group">
           <div class="input-field-wrap">
             <i data-lucide="lock" class="input-icon"></i>
-            <input type="text" id="stu-pass" placeholder="Password" value="student123" required />
-          </div>
-        </div>
-        <div class="input-group">
-          <label>Phone & Group</label>
-          <div class="input-field-wrap">
-            <i data-lucide="phone" class="input-icon"></i>
-            <input type="text" id="stu-phone" placeholder="+998 90 123 45 67" />
-          </div>
-        </div>
-        <div class="input-group">
-          <div class="input-field-wrap">
-            <i data-lucide="layers" class="input-icon"></i>
-            <select id="stu-group">
-              <option value="">Assign to Group</option>
-              ${state.groups.map((g) => `<option value="${g.id}">${g.name}</option>`).join('')}
-            </select>
+            <input type="text" id="stu-pass" value="student123" required />
           </div>
         </div>
         <button type="submit" class="btn btn-primary"><i data-lucide="plus" class="icon-sm"></i><span>Enroll Student</span></button>
@@ -694,7 +736,7 @@ function renderAdminStudents(container) {
         })
       });
       triggerHaptic('success');
-      showToast('Student enrolled!', 'success');
+      showToast('Student added and assigned to group!', 'success');
       loadBootstrapData();
     } catch (err) {
       showToast(err.message, 'error');
@@ -702,16 +744,88 @@ function renderAdminStudents(container) {
   });
 }
 
+// Edit Student / Change Group Modal Logic
+const editStudentModal = document.getElementById('edit-student-modal');
+window.openEditStudentModal = (studentId) => {
+  const stu = state.users.find((u) => u.id === studentId);
+  if (!stu) return;
+  triggerHaptic('light');
+
+  const grpSelect = document.getElementById('edit-stu-group');
+  grpSelect.innerHTML =
+    `<option value="">Unassigned (No Group)</option>` +
+    state.groups
+      .map((g) => `<option value="${g.id}" ${stu.group_id === g.id ? 'selected' : ''}>${g.name} (${g.level})</option>`)
+      .join('');
+
+  document.getElementById('edit-stu-id').value = stu.id;
+  document.getElementById('edit-stu-name').value = stu.full_name || '';
+  document.getElementById('edit-stu-phone').value = stu.phone || '';
+  document.getElementById('edit-stu-username').value = stu.username || '';
+  document.getElementById('edit-stu-pass').value = '';
+
+  editStudentModal.classList.add('open');
+  refreshIcons();
+};
+
+document.getElementById('close-edit-student-modal')?.addEventListener('click', () => editStudentModal.classList.remove('open'));
+document.getElementById('cancel-edit-student-btn')?.addEventListener('click', () => editStudentModal.classList.remove('open'));
+
+document.getElementById('edit-student-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('edit-stu-id').value;
+  try {
+    await apiRequest(`/api/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        full_name: document.getElementById('edit-stu-name').value,
+        group_id: document.getElementById('edit-stu-group').value,
+        phone: document.getElementById('edit-stu-phone').value,
+        username: document.getElementById('edit-stu-username').value,
+        password: document.getElementById('edit-stu-pass').value
+      })
+    });
+    editStudentModal.classList.remove('open');
+    triggerHaptic('success');
+    showToast('Student information & group updated!', 'success');
+    loadBootstrapData();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
+// ==================== ADMIN: TEACHERS ====================
 function renderAdminTeachers(container) {
-  const teachers = state.users.filter((u) => (u.role || '').toLowerCase() === 'teacher');
+  const teachers = state.users.filter((u) => u.role === 'teacher');
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="user-check" class="icon-sm"></i><span>Add Instructor</span></div>
+        <div class="section-title"><i data-lucide="briefcase" class="icon-sm"></i><span>Instructors (${teachers.length})</span></div>
+      </div>
+      <div class="item-list">
+        ${teachers
+          .map(
+            (t) => `
+          <div class="list-row">
+            <div class="row-main">
+              <h4>${t.full_name}</h4>
+              <div class="row-sub"><span>@${t.username}</span><span>• ${t.phone || ''}</span></div>
+            </div>
+            <button class="btn btn-danger-soft" onclick="deleteUserAccount(${t.id})"><i data-lucide="trash-2" class="icon-xs"></i></button>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+    </div>
+
+    <div class="card-panel fade-in-up">
+      <div class="section-header">
+        <div class="section-title"><i data-lucide="user-check" class="icon-sm"></i><span>Add New Instructor</span></div>
       </div>
       <form id="add-teacher-form" class="form-stack">
         <div class="input-group">
-          <label>Instructor Full Name</label>
+          <label>Full Name</label>
           <div class="input-field-wrap">
             <i data-lucide="user" class="input-icon"></i>
             <input type="text" id="tch-name" placeholder="e.g., Mr. Sardor" required />
@@ -740,27 +854,6 @@ function renderAdminTeachers(container) {
         <button type="submit" class="btn btn-primary"><i data-lucide="plus" class="icon-sm"></i><span>Add Instructor</span></button>
       </form>
     </div>
-
-    <div class="card-panel fade-in-up">
-      <div class="section-header">
-        <div class="section-title"><i data-lucide="briefcase" class="icon-sm"></i><span>Instructors (${teachers.length})</span></div>
-      </div>
-      <div class="item-list">
-        ${teachers
-          .map(
-            (t) => `
-          <div class="list-row">
-            <div class="row-main">
-              <h4>${t.full_name}</h4>
-              <div class="row-sub"><span>@${t.username}</span><span>• ${t.phone || ''}</span></div>
-            </div>
-            <button class="btn btn-danger-soft" onclick="deleteUserAccount(${t.id})"><i data-lucide="trash-2" class="icon-xs"></i></button>
-          </div>
-        `
-          )
-          .join('')}
-      </div>
-    </div>
   `;
 
   document.getElementById('add-teacher-form')?.addEventListener('submit', async (e) => {
@@ -788,20 +881,21 @@ function renderAdminTeachers(container) {
 window.deleteUserAccount = async (id) => {
   try {
     await apiRequest(`/api/users/${id}`, { method: 'DELETE' });
-    showToast('Account removed', 'info');
+    showToast('Account deleted', 'info');
     loadBootstrapData();
   } catch (err) {
     showToast(err.message, 'error');
   }
 };
 
+// ==================== ADMIN: PAYMENTS ====================
 function renderAdminPayments(container) {
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
         <div class="section-title"><i data-lucide="credit-card" class="icon-sm"></i><span>Student Tuition Payments</span></div>
         <button class="btn btn-ghost" onclick="loadBootstrapData()" style="padding:6px 10px; font-size:0.78rem;">
-          <i data-lucide="refresh-cw" class="icon-xs"></i> <span>Refresh</span>
+          <i data-lucide="refresh-cw" class="icon-xs"></i><span>Refresh</span>
         </button>
       </div>
       <div class="item-list">
@@ -818,18 +912,18 @@ function renderAdminPayments(container) {
                     <h4>${p.student_name || 'Student'} — ${Number(p.amount).toLocaleString()} UZS</h4>
                     <div class="row-sub">
                       <span>Month: ${p.month}</span>
-                      <span>• Group: ${p.group_name || 'N/A'}</span>
+                      <span>• Group: ${p.group_name || 'Unassigned'}</span>
                       <span class="badge ${badgeClass}">${p.status}</span>
                     </div>
                   </div>
                   <div class="att-controls">
                     ${
                       p.receipt_image
-                        ? `<button class="btn btn-ghost" onclick="previewReceipt(${p.id})" title="View Receipt"><i data-lucide="image" class="icon-xs"></i></button>`
+                        ? `<button class="btn btn-ghost" style="padding:8px 10px;" onclick="previewReceipt(${p.id})" title="View Receipt"><i data-lucide="image" class="icon-xs"></i></button>`
                         : ''
                     }
-                    <button class="btn btn-success-soft" onclick="updatePaymentStatus(${p.id}, 'approved')" title="Approve"><i data-lucide="check" class="icon-xs"></i></button>
-                    <button class="btn btn-danger-soft" onclick="updatePaymentStatus(${p.id}, 'rejected')" title="Reject"><i data-lucide="x" class="icon-xs"></i></button>
+                    <button class="btn btn-success-soft" onclick="updatePaymentStatus(${p.id}, 'approved')"><i data-lucide="check" class="icon-xs"></i></button>
+                    <button class="btn btn-danger-soft" onclick="updatePaymentStatus(${p.id}, 'rejected')"><i data-lucide="x" class="icon-xs"></i></button>
                   </div>
                 </div>
               `;
@@ -860,14 +954,14 @@ window.updatePaymentStatus = async (id, status) => {
       body: JSON.stringify({ status })
     });
     triggerHaptic('success');
-    showToast(`Payment marked as ${status}`, 'success');
+    showToast(`Payment ${status}`, 'success');
     loadBootstrapData();
   } catch (err) {
     showToast(err.message, 'error');
   }
 };
 
-// ---------------- TEACHER VIEWS ----------------
+// ==================== TEACHER VIEWS ====================
 function renderTeacherDashboard(container) {
   const myGroups = state.groups.filter((g) => g.teacher_id === state.user.id);
   const groupsToShow = myGroups.length > 0 ? myGroups : state.groups;
@@ -875,7 +969,7 @@ function renderTeacherDashboard(container) {
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="book-open" class="icon-sm"></i><span>Assigned Classes</span></div>
+        <div class="section-title"><i data-lucide="book-open" class="icon-sm"></i><span>My Study Groups</span></div>
       </div>
       <div class="item-list">
         ${groupsToShow
@@ -883,13 +977,10 @@ function renderTeacherDashboard(container) {
             (g) => `
           <div class="list-row">
             <div class="row-main">
-              <h4>${g.name}</h4>
-              <div class="row-sub">
-                <span>Level: ${g.level}</span>
-                <span>• Schedule: ${g.schedule}</span>
-              </div>
+              <h4>${g.name} <span class="badge badge-info">${g.level}</span></h4>
+              <div class="row-sub"><span>Schedule: ${g.schedule}</span></div>
             </div>
-            <span class="badge badge-info">${g.student_count || 0} students</span>
+            <span class="badge badge-success">${g.student_count || 0} students</span>
           </div>
         `
           )
@@ -902,7 +993,6 @@ function renderTeacherDashboard(container) {
 function renderTeacherAttendance(container) {
   const myGroups = state.groups.filter((g) => g.teacher_id === state.user.id);
   const groupsList = myGroups.length > 0 ? myGroups : state.groups;
-  const selectedGroupId = groupsList[0]?.id || '';
   const today = new Date().toISOString().split('T')[0];
 
   container.innerHTML = `
@@ -930,7 +1020,7 @@ function renderTeacherAttendance(container) {
         <div id="att-student-list" class="item-list"></div>
         <button type="button" class="btn btn-primary" id="save-att-btn">
           <i data-lucide="check-circle-2" class="icon-sm"></i>
-          <span>Submit Attendance</span>
+          <span>Save Attendance</span>
         </button>
       </div>
     </div>
@@ -939,7 +1029,7 @@ function renderTeacherAttendance(container) {
   const groupSelect = document.getElementById('att-group-select');
   const renderSheet = () => {
     const gid = parseInt(groupSelect.value, 10);
-    const students = state.users.filter((u) => (u.role || '').toLowerCase() === 'student' && u.group_id === gid);
+    const students = state.users.filter((u) => u.role === 'student' && u.group_id === gid);
     const listEl = document.getElementById('att-student-list');
 
     if (students.length === 0) {
@@ -967,7 +1057,7 @@ function renderTeacherAttendance(container) {
   };
 
   groupSelect?.addEventListener('change', renderSheet);
-  if (selectedGroupId) renderSheet();
+  if (groupsList.length > 0) renderSheet();
 
   document.getElementById('save-att-btn')?.addEventListener('click', async () => {
     const gid = parseInt(groupSelect.value, 10);
@@ -996,12 +1086,9 @@ window.setStudentAtt = (studentId, status) => {
   state.attendanceDraft[studentId] = status;
   const row = document.getElementById(`att-row-${studentId}`);
   if (!row) return;
-  const btns = row.querySelectorAll('.att-pill');
-  btns.forEach((b) => {
+  row.querySelectorAll('.att-pill').forEach((b) => {
     b.className = 'att-pill';
-    if (b.textContent.toLowerCase() === status) {
-      b.classList.add(`active-${status}`);
-    }
+    if (b.textContent.toLowerCase() === status) b.classList.add(`active-${status}`);
   });
 };
 
@@ -1025,13 +1112,13 @@ function renderTeacherHomework(container) {
           <label>Assignment Title</label>
           <div class="input-field-wrap">
             <i data-lucide="book-marked" class="input-icon"></i>
-            <input type="text" id="hw-title" placeholder="Unit 5 Reading & Vocabulary Essay" required />
+            <input type="text" id="hw-title" placeholder="Unit 5 Vocabulary & Essay" required />
           </div>
         </div>
         <div class="input-group">
           <label>Instructions</label>
           <div class="input-field-wrap">
-            <textarea id="hw-desc" placeholder="Complete exercises 1-4 on page 42..."></textarea>
+            <textarea id="hw-desc" placeholder="Describe the homework task..."></textarea>
           </div>
         </div>
         <div class="input-group">
@@ -1056,10 +1143,7 @@ function renderTeacherHomework(container) {
           <div class="list-row">
             <div class="row-main">
               <h4>${h.title}</h4>
-              <div class="row-sub">
-                <span>Group: ${h.group_name || 'All'}</span>
-                <span>• Due: ${h.due_date || 'Next class'}</span>
-              </div>
+              <div class="row-sub"><span>Group: ${h.group_name || 'All'}</span><span>• Due: ${h.due_date || 'Next class'}</span></div>
               <p class="row-sub" style="margin-top:4px;">${h.description || ''}</p>
             </div>
             <button class="btn btn-danger-soft" onclick="deleteHw(${h.id})"><i data-lucide="trash-2" class="icon-xs"></i></button>
@@ -1096,14 +1180,14 @@ function renderTeacherHomework(container) {
 window.deleteHw = async (id) => {
   try {
     await apiRequest(`/api/homeworks/${id}`, { method: 'DELETE' });
-    showToast('Assignment deleted', 'info');
+    showToast('Assignment removed', 'info');
     loadBootstrapData();
   } catch (err) {
     showToast(err.message, 'error');
   }
 };
 
-// ---------------- STUDENT VIEWS ----------------
+// ==================== STUDENT VIEWS ====================
 function renderStudentDashboard(container) {
   const myAtt = state.attendance.filter((a) => a.student_id === state.user.id);
   const presentCount = myAtt.filter((a) => a.status === 'present' || a.status === 'late').length;
@@ -1142,14 +1226,13 @@ function renderStudentDashboard(container) {
 
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="calendar-days" class="icon-sm"></i><span>Recent Attendance Log</span></div>
+        <div class="section-title"><i data-lucide="calendar-days" class="icon-sm"></i><span>Attendance History</span></div>
       </div>
       <div class="item-list">
         ${
           myAtt.length === 0
             ? `<p class="row-sub">No attendance records logged yet.</p>`
             : myAtt
-                .slice(0, 12)
                 .map((a) => {
                   const badge =
                     a.status === 'present' ? 'badge-success' : a.status === 'late' ? 'badge-warning' : 'badge-danger';
@@ -1178,12 +1261,12 @@ function renderStudentHomework(container) {
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="book-marked" class="icon-sm"></i><span>Course Assignments</span></div>
+        <div class="section-title"><i data-lucide="book-marked" class="icon-sm"></i><span>My Assignments</span></div>
       </div>
       <div class="item-list">
         ${
           myHw.length === 0
-            ? `<p class="row-sub">No homework assignments posted for your group yet.</p>`
+            ? `<p class="row-sub">No assignments posted for your group yet.</p>`
             : myHw
                 .map(
                   (h) => `
@@ -1207,7 +1290,6 @@ function renderStudentHomework(container) {
   `;
 }
 
-// Client-side image compression for fast and reliable receipt upload
 function compressReceiptImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1234,7 +1316,7 @@ function compressReceiptImage(file) {
       img.onerror = () => reject(new Error('Invalid image file'));
       img.src = e.target.result;
     };
-    reader.onerror = () => reject(new Error('File read error'));
+    reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsDataURL(file);
   });
 }
@@ -1265,7 +1347,7 @@ function renderStudentPayments(container) {
           </div>
         </div>
         <div class="input-group">
-          <label>Receipt Image Screenshot</label>
+          <label>Receipt Screenshot</label>
           <div class="input-field-wrap">
             <i data-lucide="image" class="input-icon"></i>
             <input type="file" id="pay-file" accept="image/*" required />
@@ -1311,14 +1393,14 @@ function renderStudentPayments(container) {
     const fileInput = document.getElementById('pay-file');
     const btn = document.getElementById('submit-pay-btn');
     if (!fileInput.files || !fileInput.files[0]) {
-      return showToast('Please attach a receipt screenshot.', 'error');
+      return showToast('Please select a receipt image.', 'error');
     }
 
     try {
       btn.disabled = true;
       btn.innerHTML = `<span>Uploading...</span>`;
       const base64Image = await compressReceiptImage(fileInput.files[0]);
-      
+
       await apiRequest('/api/payments', {
         method: 'POST',
         body: JSON.stringify({
@@ -1330,7 +1412,7 @@ function renderStudentPayments(container) {
       });
 
       triggerHaptic('success');
-      showToast('Receipt submitted successfully for verification!', 'success');
+      showToast('Receipt uploaded successfully!', 'success');
       fileInput.value = '';
       loadBootstrapData();
     } catch (err) {
@@ -1344,7 +1426,6 @@ function renderStudentPayments(container) {
   });
 }
 
-// Initial triggers
 document.getElementById('auth-theme-toggle')?.addEventListener('click', toggleTheme);
 document.getElementById('portal-theme-toggle')?.addEventListener('click', toggleTheme);
 document.getElementById('logout-btn')?.addEventListener('click', logout);
