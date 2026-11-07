@@ -4,7 +4,15 @@ if (tg) {
   tg.expand();
 }
 
-// Haptic feedback helper for native Telegram feel
+// Get unique Telegram User ID if opened inside Telegram Mini App
+function getTelegramUserId() {
+  const tgUser = tg?.initDataUnsafe?.user;
+  if (tgUser && tgUser.id) {
+    return String(tgUser.id);
+  }
+  return null;
+}
+
 function triggerHaptic(type = 'light') {
   try {
     if (tg?.HapticFeedback) {
@@ -66,7 +74,7 @@ function showToast(message, type = 'info') {
   setTimeout(() => {
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 250);
-  }, 3200);
+  }, 3400);
 }
 
 // ==================== API HELPER ====================
@@ -82,7 +90,65 @@ async function apiRequest(url, options = {}) {
   return data;
 }
 
-// ==================== AUTH & PROFILE LOGIC ====================
+// ==================== AUTH MODE SWITCH (SIGN IN / SIGN UP) ====================
+const signinPanel = document.getElementById('signin-panel');
+const signupPanel = document.getElementById('signup-panel');
+const tabSigninBtn = document.getElementById('tab-signin-btn');
+const tabSignupBtn = document.getElementById('tab-signup-btn');
+
+async function loadPublicGroupsForSignup() {
+  try {
+    const { groups } = await apiRequest('/api/public/groups');
+    const select = document.getElementById('reg-group');
+    select.innerHTML =
+      `<option value="">Choose your study group...</option>` +
+      (groups || []).map((g) => `<option value="${g.id}">${g.name} (${g.level})</option>`).join('');
+  } catch (_) {}
+}
+
+function updateTelegramBanner() {
+  const banner = document.getElementById('tg-id-banner');
+  const textEl = document.getElementById('tg-id-status-text');
+  const tgId = getTelegramUserId();
+  const tgUser = tg?.initDataUnsafe?.user;
+
+  if (tgId) {
+    banner.classList.remove('warning');
+    textEl.textContent = `Telegram ID Verified: #${tgId} (1 account limit active)`;
+    const fullNameInput = document.getElementById('reg-fullname');
+    if (!fullNameInput.value && tgUser) {
+      fullNameInput.value = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
+    }
+  } else {
+    banner.classList.add('warning');
+    textEl.textContent = 'Please open inside Telegram Bot to verify your Telegram ID';
+  }
+}
+
+function switchAuthMode(mode) {
+  triggerHaptic('light');
+  if (mode === 'signup') {
+    signinPanel.style.display = 'none';
+    signupPanel.style.display = 'block';
+    tabSigninBtn.classList.remove('active');
+    tabSignupBtn.classList.add('active');
+    updateTelegramBanner();
+    loadPublicGroupsForSignup();
+  } else {
+    signupPanel.style.display = 'none';
+    signinPanel.style.display = 'block';
+    tabSignupBtn.classList.remove('active');
+    tabSigninBtn.classList.add('active');
+  }
+  refreshIcons();
+}
+
+tabSigninBtn.addEventListener('click', () => switchAuthMode('signin'));
+tabSignupBtn.addEventListener('click', () => switchAuthMode('signup'));
+document.getElementById('go-to-signup').addEventListener('click', () => switchAuthMode('signup'));
+document.getElementById('go-to-signin').addEventListener('click', () => switchAuthMode('signin'));
+
+// ==================== LOGIN & REGISTRATION SUBMIT ====================
 const authView = document.getElementById('auth-view');
 const portalView = document.getElementById('portal-view');
 
@@ -109,7 +175,6 @@ async function loadBootstrapData() {
     state.homeworks = data.homeworks || [];
     state.payments = data.payments || [];
 
-    // Sync logged-in user details if updated
     if (state.user) {
       const freshMe = state.users.find((u) => u.id === state.user.id);
       if (freshMe) {
@@ -138,10 +203,11 @@ function logout() {
   localStorage.removeItem('zed_user');
   portalView.classList.remove('active');
   authView.classList.add('active');
+  switchAuthMode('signin');
   refreshIcons();
 }
 
-// Login Form Submit
+// Login Form
 document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const username = document.getElementById('login-username').value.trim();
@@ -152,13 +218,17 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     btn.disabled = true;
     const { user } = await apiRequest('/api/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({
+        username,
+        password,
+        telegram_id: getTelegramUserId()
+      })
     });
     state.user = user;
     state.activeTab = 'dashboard';
     localStorage.setItem('zed_user', JSON.stringify(user));
     triggerHaptic('success');
-    showToast(`Welcome, ${user.full_name}!`, 'success');
+    showToast(`Welcome back, ${user.full_name}!`, 'success');
     enterPortal();
   } catch (err) {
     triggerHaptic('error');
@@ -168,9 +238,57 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   }
 });
 
-// Password Visibility Toggle on Login
+// Student Self-Registration Form (Enforces 1 Account Per Telegram ID)
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const tgId = getTelegramUserId();
+  if (!tgId) {
+    triggerHaptic('error');
+    return showToast('Please open this portal inside the Telegram bot to register with your Telegram ID.', 'error');
+  }
+
+  const full_name = document.getElementById('reg-fullname').value.trim();
+  const phone = document.getElementById('reg-phone').value.trim();
+  const group_id = document.getElementById('reg-group').value;
+  const username = document.getElementById('reg-username').value.trim();
+  const password = document.getElementById('reg-password').value.trim();
+  const btn = document.getElementById('register-submit-btn');
+
+  try {
+    btn.disabled = true;
+    const { user } = await apiRequest('/api/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        full_name,
+        phone,
+        group_id,
+        username,
+        password,
+        telegram_id: tgId
+      })
+    });
+    state.user = user;
+    state.activeTab = 'dashboard';
+    localStorage.setItem('zed_user', JSON.stringify(user));
+    triggerHaptic('success');
+    showToast('Registration complete! Welcome to ZED Academy.', 'success');
+    enterPortal();
+  } catch (err) {
+    triggerHaptic('error');
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Password Visibility Toggles
 document.getElementById('toggle-login-pass').addEventListener('click', () => {
   const input = document.getElementById('login-password');
+  input.type = input.type === 'password' ? 'text' : 'password';
+});
+
+document.getElementById('toggle-reg-pass').addEventListener('click', () => {
+  const input = document.getElementById('reg-password');
   input.type = input.type === 'password' ? 'text' : 'password';
 });
 
@@ -485,7 +603,7 @@ function renderAdminStudents(container) {
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="user-plus" class="icon-sm"></i><span>Register Student</span></div>
+        <div class="section-title"><i data-lucide="user-plus" class="icon-sm"></i><span>Register Student Manually</span></div>
       </div>
       <form id="add-student-form" class="form-stack">
         <div class="input-group">
@@ -543,6 +661,7 @@ function renderAdminStudents(container) {
                 <span>@${s.username}</span>
                 <span>• Group: ${s.group_name || 'Unassigned'}</span>
                 <span>• ${s.phone || 'No phone'}</span>
+                ${s.telegram_id ? `<span class="badge badge-info">TG: #${s.telegram_id}</span>` : ''}
               </div>
             </div>
             <button class="btn btn-danger-soft" onclick="deleteUserAccount(${s.id})"><i data-lucide="trash-2" class="icon-xs"></i></button>
@@ -1079,7 +1198,6 @@ function renderStudentHomework(container) {
   `;
 }
 
-// Helper to compress image on client before upload
 function compressReceiptImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
