@@ -32,6 +32,12 @@ const state = {
   payments: [],
   quizzes: [],
   quiz_submissions: [],
+  payment_card: {
+    card_number: '8600 1234 5678 9012',
+    card_holder: 'ABDURAHMON DIRECTOR',
+    bank_name: 'Uzcard / Humo',
+    payment_note: 'Please transfer your monthly tuition to this card and upload the receipt screenshot below.'
+  },
   attendanceDraft: {},
   studentSearchQuery: '',
   studentGroupFilter: 'all'
@@ -83,6 +89,32 @@ async function apiRequest(url, options = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
+}
+
+// Copy Card Number Helper
+window.copyTuitionCardNumber = (cardNumber) => {
+  const cleanDigits = String(cardNumber || '').replace(/\s+/g, '');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(cleanDigits).then(() => {
+      triggerHaptic('success');
+      showToast(`Card number copied: ${cleanDigits}`, 'success');
+    }).catch(() => {
+      fallbackCopy(cleanDigits);
+    });
+  } else {
+    fallbackCopy(cleanDigits);
+  }
+};
+
+function fallbackCopy(text) {
+  const temp = document.createElement('input');
+  temp.value = text;
+  document.body.appendChild(temp);
+  temp.select();
+  document.execCommand('copy');
+  temp.remove();
+  triggerHaptic('success');
+  showToast(`Card number copied: ${text}`, 'success');
 }
 
 // ==================== NEXT LESSON CALCULATOR ====================
@@ -241,6 +273,9 @@ window.loadBootstrapData = async function () {
     state.payments = data.payments || [];
     state.quizzes = data.quizzes || [];
     state.quiz_submissions = data.quiz_submissions || [];
+    if (data.payment_card) {
+      state.payment_card = data.payment_card;
+    }
 
     if (state.user) {
       const freshMe = state.users.find((u) => u.id === state.user.id);
@@ -400,7 +435,7 @@ function getTabsForRole(role) {
       { id: 'students', label: 'Students', icon: 'users' },
       { id: 'quiz', label: 'Daily Quiz', icon: 'brain-circuit' },
       { id: 'teachers', label: 'Teachers', icon: 'user-check' },
-      { id: 'payments', label: 'Payments', icon: 'credit-card' }
+      { id: 'payments', label: 'Payments & Card', icon: 'credit-card' }
     ];
   }
   if (r === 'teacher') {
@@ -843,13 +878,11 @@ function getFilteredStudentsList() {
   const grpFilter = state.studentGroupFilter || 'all';
 
   return allStudents.filter((s) => {
-    // Group filter check
     if (grpFilter === 'unassigned' && s.group_id) return false;
     if (grpFilter !== 'all' && grpFilter !== 'unassigned' && String(s.group_id) !== String(grpFilter)) {
       return false;
     }
 
-    // Search query check (name, username, phone, group name, telegram_id)
     if (!q) return true;
     const matchName = (s.full_name || '').toLowerCase().includes(q);
     const matchUser = (s.username || '').toLowerCase().includes(q);
@@ -930,7 +963,6 @@ function renderAdminStudents(container) {
         </button>
       </div>
 
-      <!-- SEARCH & GROUP FILTER BAR -->
       <div class="form-stack" style="margin-bottom: 16px;">
         <div class="input-field-wrap">
           <i data-lucide="search" class="input-icon"></i>
@@ -1009,13 +1041,11 @@ function renderAdminStudents(container) {
     </div>
   `;
 
-  // Live Search Input Listener
   document.getElementById('student-search-input')?.addEventListener('input', (e) => {
     state.studentSearchQuery = e.target.value;
     updateStudentsListDOM();
   });
 
-  // Group Filter Listener
   document.getElementById('student-group-filter')?.addEventListener('change', (e) => {
     state.studentGroupFilter = e.target.value;
     updateStudentsListDOM();
@@ -1189,12 +1219,83 @@ window.deleteUserAccount = async (id) => {
   }
 };
 
-// ==================== ADMIN: PAYMENTS ====================
+// ==================== ADMIN: PAYMENTS & CARD SETTINGS ====================
 function renderAdminPayments(container) {
+  const card = state.payment_card || {};
+
   container.innerHTML = `
+    <!-- ADMIN PAYMENT CARD CONFIGURATION -->
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="credit-card" class="icon-sm"></i><span>Student Tuition Payments</span></div>
+        <div class="section-title">
+          <i data-lucide="credit-card" class="icon-sm"></i>
+          <span>Academy Tuition Card Settings (Visible to Students)</span>
+        </div>
+      </div>
+
+      <!-- Live Visual Preview of Card -->
+      <div class="bank-card-visual">
+        <div class="bank-card-top">
+          <span class="bank-chip-label">
+            <i data-lucide="landmark" class="icon-xs"></i>
+            <span>${card.bank_name || 'Uzcard / Humo'}</span>
+          </span>
+          <i data-lucide="wifi" class="icon-sm"></i>
+        </div>
+        <div class="bank-card-number-row">
+          <span class="bank-card-number">${card.card_number || '8600 0000 0000 0000'}</span>
+        </div>
+        <div class="bank-card-bottom">
+          <div>
+            <div style="font-size:0.68rem; opacity:0.75;">CARD HOLDER</div>
+            <div class="bank-holder-name">${card.card_holder || 'ZED ACADEMY'}</div>
+          </div>
+          <span class="badge badge-success">Active for Students</span>
+        </div>
+      </div>
+
+      <form id="admin-card-settings-form" class="form-stack">
+        <div class="input-group">
+          <label>Card Number (16 digits)</label>
+          <div class="input-field-wrap">
+            <i data-lucide="credit-card" class="input-icon"></i>
+            <input type="text" id="card-num-input" value="${card.card_number || ''}" placeholder="8600 1234 5678 9012" required />
+          </div>
+        </div>
+        <div class="stats-grid" style="margin-bottom:0;">
+          <div class="input-group">
+            <label>Card Holder Name</label>
+            <div class="input-field-wrap">
+              <i data-lucide="user-check" class="input-icon"></i>
+              <input type="text" id="card-holder-input" value="${card.card_holder || ''}" placeholder="ABDURAHMON..." required />
+            </div>
+          </div>
+          <div class="input-group">
+            <label>Bank / Card Type</label>
+            <div class="input-field-wrap">
+              <i data-lucide="landmark" class="input-icon"></i>
+              <input type="text" id="card-bank-input" value="${card.bank_name || ''}" placeholder="Uzcard / Humo / Click" />
+            </div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Payment Instruction Note for Students</label>
+          <div class="input-field-wrap">
+            <i data-lucide="info" class="input-icon"></i>
+            <input type="text" id="card-note-input" value="${card.payment_note || ''}" placeholder="Transfer exact tuition fee and upload receipt screenshot." />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="check" class="icon-sm"></i>
+          <span>Save Card Details</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- STUDENT SUBMITTED RECEIPTS LIST -->
+    <div class="card-panel fade-in-up">
+      <div class="section-header">
+        <div class="section-title"><i data-lucide="receipt" class="icon-sm"></i><span>Student Tuition Receipts (${state.payments.length})</span></div>
         <button class="btn btn-ghost" onclick="loadBootstrapData()" style="padding:6px 10px; font-size:0.78rem;">
           <i data-lucide="refresh-cw" class="icon-xs"></i><span>Refresh</span>
         </button>
@@ -1234,6 +1335,27 @@ function renderAdminPayments(container) {
       </div>
     </div>
   `;
+
+  document.getElementById('admin-card-settings-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const res = await apiRequest('/api/payment-settings', {
+        method: 'PUT',
+        body: JSON.stringify({
+          card_number: document.getElementById('card-num-input').value,
+          card_holder: document.getElementById('card-holder-input').value,
+          bank_name: document.getElementById('card-bank-input').value,
+          payment_note: document.getElementById('card-note-input').value
+        })
+      });
+      state.payment_card = res.payment_card;
+      triggerHaptic('success');
+      showToast('Tuition payment card updated for all students!', 'success');
+      loadBootstrapData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
 }
 
 window.previewReceipt = (paymentId) => {
@@ -1807,19 +1929,58 @@ function compressReceiptImage(file) {
   });
 }
 
+// ==================== STUDENT PAYMENTS (WITH ACADEMY VIRTUAL CARD & COPY BUTTON) ====================
 function renderStudentPayments(container) {
   const myPayments = state.payments.filter((p) => p.student_id === state.user.id);
   const myGroup = state.groups.find((g) => g.id === state.user.group_id);
   const defaultFee = myGroup?.monthly_fee || 450000;
+  const card = state.payment_card || {};
 
   container.innerHTML = `
+    <!-- ACADEMY TUITION BANK CARD FOR STUDENT -->
+    <div class="bank-card-visual fade-in-up">
+      <div class="bank-card-top">
+        <span class="bank-chip-label">
+          <i data-lucide="landmark" class="icon-xs"></i>
+          <span>${card.bank_name || 'Uzcard / Humo'}</span>
+        </span>
+        <span style="font-size:0.76rem; font-weight:700; opacity:0.9;">ZED Academy Tuition</span>
+      </div>
+
+      <div class="bank-card-number-row">
+        <span class="bank-card-number">${card.card_number || '8600 0000 0000 0000'}</span>
+        <button type="button" class="copy-card-btn" onclick="copyTuitionCardNumber('${card.card_number || ''}')">
+          <i data-lucide="copy" class="icon-xs"></i>
+          <span>Copy</span>
+        </button>
+      </div>
+
+      <div class="bank-card-bottom">
+        <div>
+          <div style="font-size:0.68rem; opacity:0.75;">CARD HOLDER NAME</div>
+          <div class="bank-holder-name">${card.card_holder || 'ZED ACADEMY'}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:0.68rem; opacity:0.75;">MONTHLY FEE</div>
+          <div style="font-weight:800;">${Number(defaultFee).toLocaleString()} UZS</div>
+        </div>
+      </div>
+
+      ${
+        card.payment_note
+          ? `<div class="bank-note-banner">💡 ${card.payment_note}</div>`
+          : ''
+      }
+    </div>
+
+    <!-- UPLOAD RECEIPT FORM -->
     <div class="card-panel fade-in-up">
       <div class="section-header">
         <div class="section-title"><i data-lucide="upload-cloud" class="icon-sm"></i><span>Upload Tuition Receipt</span></div>
       </div>
       <form id="student-pay-form" class="form-stack">
         <div class="input-group">
-          <label>Amount (UZS)</label>
+          <label>Amount Transferred (UZS)</label>
           <div class="input-field-wrap">
             <i data-lucide="banknote" class="input-icon"></i>
             <input type="number" id="pay-amount" value="${defaultFee}" required />
