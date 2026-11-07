@@ -20,7 +20,7 @@
   <div class="ambient-glow glow-2"></div>
 
   <div class="app-shell">
-    <!-- ==================== AUTH / LOGIN VIEW ==================== -->
+    <!-- ==================== AUTH / LOGIN & REGISTER VIEW ==================== -->
     <section id="auth-view" class="view-section active">
       <div class="auth-top-bar">
         <div class="brand-pill">
@@ -39,34 +39,123 @@
             <i data-lucide="sparkles" class="icon-lg"></i>
           </div>
         </div>
-        <h1 class="auth-title">Welcome Back</h1>
-        <p class="auth-subtitle">Sign in to access your ZED Academy learning & management portal</p>
 
-        <form id="login-form" class="form-stack">
-          <div class="input-group">
-            <label for="login-username">Username</label>
-            <div class="input-field-wrap">
-              <i data-lucide="user" class="input-icon"></i>
-              <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username" required />
-            </div>
-          </div>
-
-          <div class="input-group">
-            <label for="login-password">Password</label>
-            <div class="input-field-wrap">
-              <i data-lucide="lock" class="input-icon"></i>
-              <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" required />
-              <button type="button" class="password-eye-btn" id="toggle-login-pass" aria-label="Show password">
-                <i data-lucide="eye"></i>
-              </button>
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-primary btn-block" id="login-submit-btn">
+        <!-- Mode Switcher Pills -->
+        <div class="auth-mode-switch">
+          <button type="button" class="auth-tab-btn active" id="tab-signin-btn">
+            <i data-lucide="log-in" class="icon-xs"></i>
             <span>Sign In</span>
-            <i data-lucide="arrow-right" class="icon-sm"></i>
           </button>
-        </form>
+          <button type="button" class="auth-tab-btn" id="tab-signup-btn">
+            <i data-lucide="user-plus" class="icon-xs"></i>
+            <span>Student Sign Up</span>
+          </button>
+        </div>
+
+        <!-- SIGN IN FORM -->
+        <div id="signin-panel">
+          <h1 class="auth-title">Welcome Back</h1>
+          <p class="auth-subtitle">Sign in to access your ZED Academy learning & management portal</p>
+
+          <form id="login-form" class="form-stack">
+            <div class="input-group">
+              <label for="login-username">Username</label>
+              <div class="input-field-wrap">
+                <i data-lucide="user" class="input-icon"></i>
+                <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username" required />
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label for="login-password">Password</label>
+              <div class="input-field-wrap">
+                <i data-lucide="lock" class="input-icon"></i>
+                <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" required />
+                <button type="button" class="password-eye-btn" id="toggle-login-pass" aria-label="Show password">
+                  <i data-lucide="eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="login-submit-btn">
+              <span>Sign In</span>
+              <i data-lucide="arrow-right" class="icon-sm"></i>
+            </button>
+          </form>
+
+          <div class="auth-footer-switch">
+            <span>New student at ZED Academy?</span>
+            <button type="button" class="link-btn" id="go-to-signup">Create Student Account</button>
+          </div>
+        </div>
+
+        <!-- STUDENT SIGN UP FORM (1 Account Per Telegram ID) -->
+        <div id="signup-panel" style="display: none;">
+          <h1 class="auth-title">Student Registration</h1>
+          <p class="auth-subtitle">Create your personal student account linked to your Telegram ID</p>
+
+          <div class="tg-verify-banner" id="tg-id-banner">
+            <i data-lucide="shield-check" class="icon-sm"></i>
+            <span id="tg-id-status-text">Checking Telegram verification...</span>
+          </div>
+
+          <form id="register-form" class="form-stack">
+            <div class="input-group">
+              <label for="reg-fullname">Full Name</label>
+              <div class="input-field-wrap">
+                <i data-lucide="badge-check" class="input-icon"></i>
+                <input type="text" id="reg-fullname" placeholder="e.g., Sardor Aliyev" required />
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label for="reg-phone">Phone Number</label>
+              <div class="input-field-wrap">
+                <i data-lucide="phone" class="input-icon"></i>
+                <input type="text" id="reg-phone" placeholder="+998 90 123 45 67" required />
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label for="reg-group">Select Study Group</label>
+              <div class="input-field-wrap">
+                <i data-lucide="layers" class="input-icon"></i>
+                <select id="reg-group" required>
+                  <option value="">Choose your group...</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label for="reg-username">Create Username</label>
+              <div class="input-field-wrap">
+                <i data-lucide="at-sign" class="input-icon"></i>
+                <input type="text" id="reg-username" placeholder="Choose a unique username" autocomplete="username" required />
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label for="reg-password">Create Password</label>
+              <div class="input-field-wrap">
+                <i data-lucide="lock-keyhole" class="input-icon"></i>
+                <input type="password" id="reg-password" placeholder="Create a strong password" autocomplete="new-password" required />
+                <button type="button" class="password-eye-btn" id="toggle-reg-pass" aria-label="Show password">
+                  <i data-lucide="eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="register-submit-btn">
+              <i data-lucide="user-check" class="icon-sm"></i>
+              <span>Complete Registration</span>
+            </button>
+          </form>
+
+          <div class="auth-footer-switch">
+            <span>Already have an account?</span>
+            <button type="button" class="link-btn" id="go-to-signin">Sign In Here</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -100,7 +189,7 @@
         </div>
       </header>
 
-      <!-- Navigation Tabs (Dynamically rendered per Role) -->
+      <!-- Navigation Tabs -->
       <nav class="nav-tabs fade-in-up" id="role-nav-tabs"></nav>
 
       <!-- Dynamic Tab Content Container -->
