@@ -18,7 +18,7 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Initialize & Safely Migrate Tables (Preserves Existing Data)
+// Initialize & Safely Migrate Tables
 async function initDB() {
   const client = await pool.connect();
   try {
@@ -31,7 +31,7 @@ async function initDB() {
         role VARCHAR(30) NOT NULL DEFAULT 'student',
         phone VARCHAR(50) DEFAULT '',
         group_id INTEGER DEFAULT NULL,
-        telegram_id VARCHAR(100) DEFAULT NULL,
+        telegram_id VARCHAR(100) UNIQUE DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -77,14 +77,16 @@ async function initDB() {
       );
     `);
 
-    // Safe column checks in case older schema exists
+    // Ensure columns & unique index on telegram_id exist
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50) DEFAULT '';`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS group_id INTEGER DEFAULT NULL;`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id VARCHAR(100) DEFAULT NULL;`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id_unique ON users (telegram_id) WHERE telegram_id IS NOT NULL;`);
     await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS level VARCHAR(80) DEFAULT 'General English';`);
     await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS schedule VARCHAR(120) DEFAULT 'Mon-Wed-Fri 14:00';`);
     await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS monthly_fee NUMERIC(12, 2) DEFAULT 400000;`);
 
-    // Seed Default Accounts only if users table is empty
+    // Seed Default Accounts if empty
     const { rows } = await client.query('SELECT COUNT(*) AS count FROM users');
     if (parseInt(rows[0].count, 10) === 0) {
       await client.query(`
@@ -124,22 +126,109 @@ async function initDB() {
 
 initDB();
 
-// Root route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// ================= AUTH & PROFILE API =================
+// ================= PUBLIC GROUPS LIST FOR REGISTRATION =================
+app.get('/api/public/groups', async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT id, name, level, schedule FROM groups ORDER BY id ASC`);
+    res.json({ groups: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load groups.' });
+  }
+});
+
+// ================= AUTH, REGISTRATION & PROFILE API =================
+
+// Student Self-Registration (1 Account per Telegram ID)
+app.post('/api/register', async (req, res) => {
+  try {
+    const { full_name, username, password, phone, group_id, telegram_id } = req.body;
+
+    if (!full_name || !username || !password) {
+      return res.status(400).json({ error: 'Full name, username, and password are required.' });
+    }
+
+    if (!telegram_id) {
+      return res.status(400).json({
+        error: 'Registration requires opening the portal inside Telegram so your Telegram ID can be verified.'
+      });
+    }
+
+    const cleanTgId = String(telegram_id).trim();
+
+    // 1. Check if this Telegram ID already has an account
+    const tgCheck = await pool.query(
+      'SELECT id, username FROM users WHERE telegram_id = $1 LIMIT 1',
+      [cleanTgId]
+    );
+    if (tgCheck.rows.length > 0) {
+      return res.status(400).json({
+        error: `An account (@${tgCheck.rows[0].username}) is already registered with this Telegram profile. Only 1 account per Telegram user is allowed.`
+      });
+    }
+
+    // 2. Check if username is already taken
+    const userCheck = await pool.query(
+      'SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1',
+      [username.trim()]
+    );
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'This username is already taken. Please choose another.' });
+    }
+
+    // 3. Create student account
+    const insertRes = await pool.query(
+      `INSERT INTO users (full_name, username, password, role, phone, group_id, telegram_id)
+       VALUES ($1, $2, $3, 'student', $4, $5, $6)
+       RETURNING id`,
+      [
+        full_name.trim(),
+        username.trim(),
+        password.trim(),
+        (phone || '').trim(),
+        group_id ? parseInt(group_id, 10) : null,
+        cleanTgId
+      ]
+    );
+
+    const newUserId = insertRes.rows[0].id;
+    const fullUser = await pool.query(
+      `SELECT u.id, u.full_name, u.username, u.role, u.phone, u.group_id, u.telegram_id,
+              g.name AS group_name, g.level AS group_level, g.schedule AS group_schedule, g.monthly_fee
+       FROM users u
+       LEFT JOIN groups g ON u.group_id = g.id
+       WHERE u.id = $1`,
+      [newUserId]
+    );
+
+    res.json({
+      message: 'Account registered successfully!',
+      user: fullUser.rows[0]
+    });
+  } catch (err) {
+    console.error('Registration error:', err.message);
+    if (err.code === '23505') {
+      return res.status(400).json({
+        error: 'This Telegram account or username is already registered.'
+      });
+    }
+    res.status(500).json({ error: 'Server error during registration.' });
+  }
+});
 
 // Login
 app.post('/api/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, telegram_id } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: 'Please enter both username and password.' });
     }
+
     const result = await pool.query(
-      `SELECT u.id, u.full_name, u.username, u.role, u.phone, u.group_id,
+      `SELECT u.id, u.full_name, u.username, u.role, u.phone, u.group_id, u.telegram_id,
               g.name AS group_name, g.level AS group_level, g.schedule AS group_schedule, g.monthly_fee
        FROM users u
        LEFT JOIN groups g ON u.group_id = g.id
@@ -152,7 +241,19 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password.' });
     }
 
-    res.json({ user: result.rows[0] });
+    const user = result.rows[0];
+
+    // Optional automatic binding: if student was created by admin without telegram_id, bind it on first Telegram login
+    if (telegram_id && !user.telegram_id && user.role === 'student') {
+      const cleanTgId = String(telegram_id).trim();
+      const existingOwner = await pool.query('SELECT id FROM users WHERE telegram_id = $1 LIMIT 1', [cleanTgId]);
+      if (existingOwner.rows.length === 0) {
+        await pool.query('UPDATE users SET telegram_id = $1 WHERE id = $2', [cleanTgId, user.id]);
+        user.telegram_id = cleanTgId;
+      }
+    }
+
+    res.json({ user });
   } catch (err) {
     console.error('Login error:', err.message);
     res.status(500).json({ error: 'Server error during sign in.' });
@@ -167,14 +268,12 @@ app.put('/api/profile', async (req, res) => {
       return res.status(400).json({ error: 'Name and username are required.' });
     }
 
-    // Check existing user
     const userCheck = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
     if (userCheck.rows.length === 0) {
       return res.status(404).json({ error: 'User account not found.' });
     }
     const existingUser = userCheck.rows[0];
 
-    // Check if username is taken by another user
     const usernameCheck = await pool.query(
       'SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2',
       [username.trim(), id]
@@ -183,7 +282,6 @@ app.put('/api/profile', async (req, res) => {
       return res.status(400).json({ error: 'This username is already taken. Please choose another.' });
     }
 
-    // Determine password to save
     let updatedPassword = existingUser.password;
     if (new_password && new_password.trim() !== '') {
       if (current_password && current_password !== existingUser.password) {
@@ -200,7 +298,7 @@ app.put('/api/profile', async (req, res) => {
     );
 
     const updated = await pool.query(
-      `SELECT u.id, u.full_name, u.username, u.role, u.phone, u.group_id,
+      `SELECT u.id, u.full_name, u.username, u.role, u.phone, u.group_id, u.telegram_id,
               g.name AS group_name, g.level AS group_level, g.schedule AS group_schedule, g.monthly_fee
        FROM users u
        LEFT JOIN groups g ON u.group_id = g.id
@@ -217,12 +315,11 @@ app.put('/api/profile', async (req, res) => {
 
 // ================= DASHBOARD & DATA API =================
 
-// Full state fetch for logged-in user
 app.get('/api/bootstrap', async (req, res) => {
   try {
     const [usersRes, groupsRes, attendanceRes, homeworksRes, paymentsRes] = await Promise.all([
       pool.query(`
-        SELECT u.id, u.full_name, u.username, u.role, u.phone, u.group_id, u.created_at,
+        SELECT u.id, u.full_name, u.username, u.role, u.phone, u.group_id, u.telegram_id, u.created_at,
                g.name AS group_name
         FROM users u
         LEFT JOIN groups g ON u.group_id = g.id
@@ -272,7 +369,7 @@ app.get('/api/bootstrap', async (req, res) => {
   }
 });
 
-// Create User (Student or Teacher or Admin)
+// Create User (Admin panel)
 app.post('/api/users', async (req, res) => {
   try {
     const { full_name, username, password, role, phone, group_id } = req.body;
@@ -345,7 +442,7 @@ app.delete('/api/groups/:id', async (req, res) => {
   }
 });
 
-// Save Attendance (Batch or Single)
+// Save Attendance
 app.post('/api/attendance', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -405,7 +502,7 @@ app.delete('/api/homeworks/:id', async (req, res) => {
   }
 });
 
-// Submit Payment Receipt (Student)
+// Submit Payment Receipt
 app.post('/api/payments', async (req, res) => {
   try {
     const { student_id, amount, month, receipt_image, note } = req.body;
@@ -424,7 +521,7 @@ app.post('/api/payments', async (req, res) => {
   }
 });
 
-// Update Payment Status (Admin Approve / Reject)
+// Update Payment Status
 app.put('/api/payments/:id', async (req, res) => {
   try {
     const { status } = req.body;
@@ -451,7 +548,7 @@ function startBot(webAppUrl) {
     bot.start((ctx) => {
       const firstName = ctx.from?.first_name || 'Student';
       ctx.reply(
-        `Welcome to ZED Academy, ${firstName}!\n\nTap the button below to open your personal portal, check attendance, view assignments, and manage payments.`,
+        `Welcome to ZED Academy, ${firstName}!\n\nTap the button below to open your personal portal, register or sign in, check attendance, view assignments, and manage payments.`,
         Markup.inlineKeyboard([
           [Markup.button.webApp('Open ZED Academy Portal', webAppUrl)]
         ])
