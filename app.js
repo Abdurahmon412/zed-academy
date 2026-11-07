@@ -30,8 +30,12 @@ const state = {
   attendance: [],
   homeworks: [],
   payments: [],
+  quizzes: [],
+  quiz_submissions: [],
   attendanceDraft: {}
 };
+
+let countdownInterval = null;
 
 function applyTheme(theme) {
   state.theme = theme;
@@ -77,6 +81,60 @@ async function apiRequest(url, options = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
+}
+
+// ==================== NEXT LESSON CALCULATOR ====================
+function computeNextLessonInfo(scheduleStr) {
+  if (!scheduleStr) {
+    return { label: 'Schedule TBA', remainingText: 'Ask Instructor' };
+  }
+  const dayMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const lower = scheduleStr.toLowerCase();
+
+  let targetDays = [];
+  Object.keys(dayMap).forEach((k) => {
+    if (lower.includes(k)) targetDays.push(dayMap[k]);
+  });
+  if (targetDays.length === 0) targetDays = [1, 3, 5]; // Default Mon-Wed-Fri
+
+  const timeMatch = scheduleStr.match(/(\d{1,2}):(\d{2})/);
+  const hour = timeMatch ? parseInt(timeMatch[1], 10) : 15;
+  const minute = timeMatch ? parseInt(timeMatch[2], 10) : 0;
+
+  const now = new Date();
+  let bestDate = null;
+
+  for (let offset = 0; offset <= 7; offset++) {
+    const candidate = new Date(now);
+    candidate.setDate(now.getDate() + offset);
+    candidate.setHours(hour, minute, 0, 0);
+
+    if (targetDays.includes(candidate.getDay()) && candidate > now) {
+      bestDate = candidate;
+      break;
+    }
+  }
+
+  if (!bestDate) {
+    return { label: scheduleStr, remainingText: 'Upcoming' };
+  }
+
+  const diffMs = bestDate - now;
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const mins = totalMinutes % 60;
+
+  let rem = '';
+  if (days > 0) rem += `${days}d `;
+  rem += `${hours}h ${mins}m`;
+
+  const isToday = bestDate.toDateString() === now.toDateString();
+  const timeFormatted = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const dayLabel = isToday ? `Today at ${timeFormatted}` : `${dayNames[bestDate.getDay()]}, ${timeFormatted}`;
+
+  return { label: dayLabel, remainingText: rem };
 }
 
 // ==================== AUTH MODE SWITCH ====================
@@ -158,6 +216,15 @@ function updateHeaderUI() {
     student: 'Student'
   };
   document.getElementById('header-role-text').textContent = roleLabels[role] || 'Member';
+
+  const coinPill = document.getElementById('header-coin-pill');
+  const coinCount = document.getElementById('header-coin-count');
+  if (role === 'student') {
+    coinPill.style.display = 'inline-flex';
+    coinCount.textContent = `${state.user.zed_coins || 0} ZED`;
+  } else {
+    coinPill.style.display = 'none';
+  }
 }
 
 window.loadBootstrapData = async function () {
@@ -168,6 +235,8 @@ window.loadBootstrapData = async function () {
     state.attendance = data.attendance || [];
     state.homeworks = data.homeworks || [];
     state.payments = data.payments || [];
+    state.quizzes = data.quizzes || [];
+    state.quiz_submissions = data.quiz_submissions || [];
 
     if (state.user) {
       const freshMe = state.users.find((u) => u.id === state.user.id);
@@ -193,6 +262,7 @@ function enterPortal() {
 
 function logout() {
   triggerHaptic('medium');
+  if (countdownInterval) clearInterval(countdownInterval);
   state.user = null;
   localStorage.removeItem('zed_user');
   portalView.classList.remove('active');
@@ -324,6 +394,7 @@ function getTabsForRole(role) {
       { id: 'dashboard', label: 'Overview', icon: 'layout-dashboard' },
       { id: 'groups', label: 'Groups', icon: 'layers' },
       { id: 'students', label: 'Students', icon: 'users' },
+      { id: 'quiz', label: 'Daily Quiz', icon: 'brain-circuit' },
       { id: 'teachers', label: 'Teachers', icon: 'user-check' },
       { id: 'payments', label: 'Payments', icon: 'credit-card' }
     ];
@@ -331,7 +402,7 @@ function getTabsForRole(role) {
   if (r === 'teacher') {
     return [
       { id: 'dashboard', label: 'My Groups', icon: 'book-open' },
-      { id: 'attendance', label: 'Attendance', icon: 'calendar-check' },
+      { id: 'attendance', label: 'Attendance & Coins', icon: 'calendar-check' },
       { id: 'homework', label: 'Assignments', icon: 'file-text' }
     ];
   }
@@ -368,6 +439,7 @@ function renderNavigationTabs() {
 }
 
 function renderActiveTab() {
+  if (countdownInterval) clearInterval(countdownInterval);
   const container = document.getElementById('tab-content-area');
   const role = (state.user?.role || 'student').toLowerCase();
 
@@ -375,6 +447,7 @@ function renderActiveTab() {
     if (state.activeTab === 'dashboard') renderAdminDashboard(container);
     else if (state.activeTab === 'groups') renderAdminGroups(container);
     else if (state.activeTab === 'students') renderAdminStudents(container);
+    else if (state.activeTab === 'quiz') renderAdminQuizzes(container);
     else if (state.activeTab === 'teachers') renderAdminTeachers(container);
     else if (state.activeTab === 'payments') renderAdminPayments(container);
   } else if (role === 'teacher') {
@@ -406,8 +479,8 @@ function renderAdminDashboard(container) {
         <div class="stat-icon-box"><i data-lucide="layers"></i></div>
       </div>
       <div class="stat-card">
-        <div><div class="stat-label">Instructors</div><div class="stat-value">${teachers.length}</div></div>
-        <div class="stat-icon-box"><i data-lucide="user-check"></i></div>
+        <div><div class="stat-label">Daily Quizzes</div><div class="stat-value">${state.quizzes.length}</div></div>
+        <div class="stat-icon-box"><i data-lucide="brain-circuit"></i></div>
       </div>
       <div class="stat-card">
         <div><div class="stat-label">Pending Receipts</div><div class="stat-value">${pendingPayments.length}</div></div>
@@ -440,7 +513,7 @@ function renderAdminDashboard(container) {
                 </div>
                 <div class="att-controls">
                   <span class="badge badge-success">${g.student_count || 0} students</span>
-                  <button class="btn btn-ghost" style="padding:7px 10px;" onclick="openEditGroupModal(${g.id})" title="Edit Group"><i data-lucide="pencil" class="icon-xs"></i></button>
+                  <button class="btn btn-ghost" style="padding:7px 10px;" onclick="openEditGroupModal(${g.id})"><i data-lucide="pencil" class="icon-xs"></i></button>
                 </div>
               </div>
             `
@@ -452,7 +525,142 @@ function renderAdminDashboard(container) {
   `;
 }
 
-// ==================== ADMIN: GROUPS (VIEW, CREATE, EDIT, DELETE) ====================
+// ==================== ADMIN: DAILY QUIZ PANEL ====================
+function renderAdminQuizzes(container) {
+  container.innerHTML = `
+    <div class="card-panel fade-in-up">
+      <div class="section-header">
+        <div class="section-title">
+          <i data-lucide="sparkles" class="icon-sm"></i>
+          <span>Create Daily Quiz Question (+10 ZED Coins)</span>
+        </div>
+      </div>
+      <form id="create-quiz-form" class="form-stack">
+        <div class="input-group">
+          <label>Quiz Question</label>
+          <div class="input-field-wrap">
+            <textarea id="qz-question" placeholder="Write today's question for students..." required></textarea>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Option A</label>
+          <div class="input-field-wrap">
+            <i data-lucide="circle-dot" class="input-icon"></i>
+            <input type="text" id="qz-opt-a" placeholder="Enter Option A" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Option B</label>
+          <div class="input-field-wrap">
+            <i data-lucide="circle-dot" class="input-icon"></i>
+            <input type="text" id="qz-opt-b" placeholder="Enter Option B" required />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Option C</label>
+          <div class="input-field-wrap">
+            <i data-lucide="circle-dot" class="input-icon"></i>
+            <input type="text" id="qz-opt-c" placeholder="Enter Option C" required />
+          </div>
+        </div>
+        <div class="stats-grid" style="margin-bottom:0;">
+          <div class="input-group">
+            <label>Correct Answer</label>
+            <div class="input-field-wrap">
+              <i data-lucide="check-circle-2" class="input-icon"></i>
+              <select id="qz-correct" required>
+                <option value="A">Option A is Correct</option>
+                <option value="B">Option B is Correct</option>
+                <option value="C">Option C is Correct</option>
+              </select>
+            </div>
+          </div>
+          <div class="input-group">
+            <label>ZED Coin Reward</label>
+            <div class="input-field-wrap">
+              <i data-lucide="coins" class="input-icon"></i>
+              <input type="number" id="qz-coins" value="10" min="1" required />
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="send" class="icon-sm"></i>
+          <span>Publish Daily Quiz</span>
+        </button>
+      </form>
+    </div>
+
+    <div class="card-panel fade-in-up">
+      <div class="section-header">
+        <div class="section-title"><i data-lucide="list-checks" class="icon-sm"></i><span>Published Quizzes (${state.quizzes.length})</span></div>
+      </div>
+      <div class="item-list">
+        ${
+          state.quizzes.length === 0
+            ? `<p class="row-sub">No quizzes published yet.</p>`
+            : state.quizzes
+                .map(
+                  (q) => `
+              <div class="list-row">
+                <div class="row-main">
+                  <h4>${q.question}</h4>
+                  <div class="row-sub">
+                    <span>A) ${q.option_a}</span>
+                    <span>• B) ${q.option_b}</span>
+                    <span>• C) ${q.option_c}</span>
+                  </div>
+                  <div class="row-sub" style="margin-top:5px;">
+                    <span class="badge badge-success">Correct: Option ${q.correct_option}</span>
+                    <span class="badge badge-gold">+${q.reward_coins} ZED Coins</span>
+                    <span class="badge badge-info">${q.correct_answers || 0} / ${q.total_answers || 0} solved</span>
+                  </div>
+                </div>
+                <button class="btn btn-danger-soft" onclick="deleteQuiz(${q.id})" title="Delete Quiz">
+                  <i data-lucide="trash-2" class="icon-xs"></i>
+                </button>
+              </div>
+            `
+                )
+                .join('')
+        }
+      </div>
+    </div>
+  `;
+
+  document.getElementById('create-quiz-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await apiRequest('/api/quizzes', {
+        method: 'POST',
+        body: JSON.stringify({
+          question: document.getElementById('qz-question').value,
+          option_a: document.getElementById('qz-opt-a').value,
+          option_b: document.getElementById('qz-opt-b').value,
+          option_c: document.getElementById('qz-opt-c').value,
+          correct_option: document.getElementById('qz-correct').value,
+          reward_coins: document.getElementById('qz-coins').value
+        })
+      });
+      triggerHaptic('success');
+      showToast('Daily Quiz published for students!', 'success');
+      loadBootstrapData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+}
+
+window.deleteQuiz = async (id) => {
+  try {
+    await apiRequest(`/api/quizzes/${id}`, { method: 'DELETE' });
+    showToast('Quiz removed', 'info');
+    loadBootstrapData();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+// ==================== ADMIN: GROUPS ====================
 function renderAdminGroups(container) {
   const teachers = state.users.filter((u) => u.role === 'teacher');
 
@@ -482,10 +690,10 @@ function renderAdminGroups(container) {
                   </div>
                 </div>
                 <div class="att-controls">
-                  <button class="btn btn-ghost" style="padding:8px 11px;" onclick="openEditGroupModal(${g.id})" title="Edit Group">
+                  <button class="btn btn-ghost" style="padding:8px 11px;" onclick="openEditGroupModal(${g.id})">
                     <i data-lucide="pencil" class="icon-xs"></i>
                   </button>
-                  <button class="btn btn-danger-soft" onclick="deleteGroup(${g.id})" title="Delete Group">
+                  <button class="btn btn-danger-soft" onclick="deleteGroup(${g.id})">
                     <i data-lucide="trash-2" class="icon-xs"></i>
                   </button>
                 </div>
@@ -527,7 +735,7 @@ function renderAdminGroups(container) {
           </div>
         </div>
         <div class="input-group">
-          <label>Class Schedule</label>
+          <label>Class Schedule (Used for Next Lesson Timer)</label>
           <div class="input-field-wrap">
             <i data-lucide="calendar" class="input-icon"></i>
             <input type="text" id="grp-schedule" value="Mon-Wed-Fri • 15:00" required />
@@ -559,7 +767,7 @@ function renderAdminGroups(container) {
         })
       });
       triggerHaptic('success');
-      showToast('Group created successfully!', 'success');
+      showToast('Group created!', 'success');
       loadBootstrapData();
     } catch (err) {
       showToast(err.message, 'error');
@@ -567,7 +775,6 @@ function renderAdminGroups(container) {
   });
 }
 
-// Edit Group Modal Logic
 const editGroupModal = document.getElementById('edit-group-modal');
 window.openEditGroupModal = (groupId) => {
   const grp = state.groups.find((g) => g.id === groupId);
@@ -609,7 +816,7 @@ document.getElementById('edit-group-form')?.addEventListener('submit', async (e)
     });
     editGroupModal.classList.remove('open');
     triggerHaptic('success');
-    showToast('Group updated successfully!', 'success');
+    showToast('Group updated!', 'success');
     loadBootstrapData();
   } catch (err) {
     showToast(err.message, 'error');
@@ -619,7 +826,6 @@ document.getElementById('edit-group-form')?.addEventListener('submit', async (e)
 window.deleteGroup = async (id) => {
   try {
     await apiRequest(`/api/groups/${id}`, { method: 'DELETE' });
-    triggerHaptic('warning');
     showToast('Group deleted', 'info');
     loadBootstrapData();
   } catch (err) {
@@ -627,7 +833,7 @@ window.deleteGroup = async (id) => {
   }
 };
 
-// ==================== ADMIN: STUDENTS (VIEW, ASSIGN/CHANGE GROUP, EDIT, DELETE) ====================
+// ==================== ADMIN: STUDENTS ====================
 function renderAdminStudents(container) {
   const students = state.users.filter((u) => u.role === 'student');
 
@@ -648,21 +854,20 @@ function renderAdminStudents(container) {
                   (s) => `
               <div class="list-row">
                 <div class="row-main">
-                  <h4>${s.full_name}</h4>
+                  <h4>${s.full_name} <span class="badge badge-gold">💎 ${s.zed_coins || 0} ZED</span></h4>
                   <div class="row-sub">
                     <span>@${s.username}</span>
                     <span class="badge ${s.group_id ? 'badge-info' : 'badge-warning'}">
                       ${s.group_name ? `Group: ${s.group_name}` : 'No Group Assigned'}
                     </span>
                     <span>• ${s.phone || 'No phone'}</span>
-                    ${s.telegram_id ? `<span class="badge badge-success">TG #${s.telegram_id}</span>` : ''}
                   </div>
                 </div>
                 <div class="att-controls">
-                  <button class="btn btn-ghost" style="padding:8px 11px;" onclick="openEditStudentModal(${s.id})" title="Assign Group / Edit Student">
+                  <button class="btn btn-ghost" style="padding:8px 11px;" onclick="openEditStudentModal(${s.id})" title="Edit Student / Group / Coins">
                     <i data-lucide="pencil" class="icon-xs"></i>
                   </button>
-                  <button class="btn btn-danger-soft" onclick="deleteUserAccount(${s.id})" title="Remove Student">
+                  <button class="btn btn-danger-soft" onclick="deleteUserAccount(${s.id})">
                     <i data-lucide="trash-2" class="icon-xs"></i>
                   </button>
                 </div>
@@ -736,7 +941,7 @@ function renderAdminStudents(container) {
         })
       });
       triggerHaptic('success');
-      showToast('Student added and assigned to group!', 'success');
+      showToast('Student enrolled!', 'success');
       loadBootstrapData();
     } catch (err) {
       showToast(err.message, 'error');
@@ -744,7 +949,6 @@ function renderAdminStudents(container) {
   });
 }
 
-// Edit Student / Change Group Modal Logic
 const editStudentModal = document.getElementById('edit-student-modal');
 window.openEditStudentModal = (studentId) => {
   const stu = state.users.find((u) => u.id === studentId);
@@ -760,6 +964,7 @@ window.openEditStudentModal = (studentId) => {
 
   document.getElementById('edit-stu-id').value = stu.id;
   document.getElementById('edit-stu-name').value = stu.full_name || '';
+  document.getElementById('edit-stu-coins').value = stu.zed_coins || 0;
   document.getElementById('edit-stu-phone').value = stu.phone || '';
   document.getElementById('edit-stu-username').value = stu.username || '';
   document.getElementById('edit-stu-pass').value = '';
@@ -780,6 +985,7 @@ document.getElementById('edit-student-form')?.addEventListener('submit', async (
       body: JSON.stringify({
         full_name: document.getElementById('edit-stu-name').value,
         group_id: document.getElementById('edit-stu-group').value,
+        zed_coins: document.getElementById('edit-stu-coins').value,
         phone: document.getElementById('edit-stu-phone').value,
         username: document.getElementById('edit-stu-username').value,
         password: document.getElementById('edit-stu-pass').value
@@ -787,7 +993,7 @@ document.getElementById('edit-student-form')?.addEventListener('submit', async (
     });
     editStudentModal.classList.remove('open');
     triggerHaptic('success');
-    showToast('Student information & group updated!', 'success');
+    showToast('Student updated!', 'success');
     loadBootstrapData();
   } catch (err) {
     showToast(err.message, 'error');
@@ -961,7 +1167,7 @@ window.updatePaymentStatus = async (id, status) => {
   }
 };
 
-// ==================== TEACHER VIEWS ====================
+// ==================== TEACHER VIEWS (WITH HOMEWORK CHECK & ZED COIN REWARDS) ====================
 function renderTeacherDashboard(container) {
   const myGroups = state.groups.filter((g) => g.teacher_id === state.user.id);
   const groupsToShow = myGroups.length > 0 ? myGroups : state.groups;
@@ -998,7 +1204,10 @@ function renderTeacherAttendance(container) {
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="calendar-check" class="icon-sm"></i><span>Mark Daily Attendance</span></div>
+        <div class="section-title">
+          <i data-lucide="calendar-check" class="icon-sm"></i>
+          <span>Mark Attendance, Homework & Award ZED Coins</span>
+        </div>
       </div>
       <div class="form-stack">
         <div class="input-group">
@@ -1006,7 +1215,7 @@ function renderTeacherAttendance(container) {
           <div class="input-field-wrap">
             <i data-lucide="layers" class="input-icon"></i>
             <select id="att-group-select">
-              ${groupsList.map((g) => `<option value="${g.id}">${g.name}</option>`).join('')}
+              ${groupsList.map((g) => `<option value="${g.id}">${g.name} (${g.level})</option>`).join('')}
             </select>
           </div>
         </div>
@@ -1019,16 +1228,19 @@ function renderTeacherAttendance(container) {
         </div>
         <div id="att-student-list" class="item-list"></div>
         <button type="button" class="btn btn-primary" id="save-att-btn">
-          <i data-lucide="check-circle-2" class="icon-sm"></i>
-          <span>Save Attendance</span>
+          <i data-lucide="sparkles" class="icon-sm"></i>
+          <span>Save Attendance & Send ZED Coins</span>
         </button>
       </div>
     </div>
   `;
 
   const groupSelect = document.getElementById('att-group-select');
+  const dateInput = document.getElementById('att-date-input');
+
   const renderSheet = () => {
     const gid = parseInt(groupSelect.value, 10);
+    const selectedDate = dateInput.value;
     const students = state.users.filter((u) => u.role === 'student' && u.group_id === gid);
     const listEl = document.getElementById('att-student-list');
 
@@ -1038,33 +1250,64 @@ function renderTeacherAttendance(container) {
     }
 
     state.attendanceDraft = {};
-    students.forEach((s) => (state.attendanceDraft[s.id] = 'present'));
+    students.forEach((s) => {
+      const existingRec = state.attendance.find(
+        (a) => a.student_id === s.id && a.group_id === gid && String(a.date).startsWith(selectedDate)
+      );
+      state.attendanceDraft[s.id] = {
+        status: existingRec ? existingRec.status : 'present',
+        homework_done: existingRec ? Boolean(existingRec.homework_done) : false,
+        coins_awarded: existingRec && existingRec.coins_awarded > 0 ? existingRec.coins_awarded : 10
+      };
+    });
 
     listEl.innerHTML = students
-      .map(
-        (s) => `
-      <div class="list-row" id="att-row-${s.id}">
-        <div class="row-main"><h4>${s.full_name}</h4></div>
-        <div class="att-controls">
-          <button type="button" class="att-pill active-present" onclick="setStudentAtt(${s.id}, 'present')">Present</button>
-          <button type="button" class="att-pill" onclick="setStudentAtt(${s.id}, 'late')">Late</button>
-          <button type="button" class="att-pill" onclick="setStudentAtt(${s.id}, 'absent')">Absent</button>
+      .map((s) => {
+        const d = state.attendanceDraft[s.id];
+        return `
+        <div class="att-student-card" id="att-row-${s.id}">
+          <div class="att-top-line">
+            <div class="row-main">
+              <h4>${s.full_name} <span class="badge badge-gold">💎 ${s.zed_coins || 0} ZED</span></h4>
+            </div>
+            <div class="att-controls">
+              <button type="button" class="att-pill ${d.status === 'present' ? 'active-present' : ''}" onclick="setStudentAtt(${s.id}, 'present')">Present</button>
+              <button type="button" class="att-pill ${d.status === 'late' ? 'active-late' : ''}" onclick="setStudentAtt(${s.id}, 'late')">Late</button>
+              <button type="button" class="att-pill ${d.status === 'absent' ? 'active-absent' : ''}" onclick="setStudentAtt(${s.id}, 'absent')">Absent</button>
+            </div>
+          </div>
+
+          <div class="att-bottom-line">
+            <button type="button" class="hw-toggle-btn ${d.homework_done ? 'hw-done' : ''}" id="hw-btn-${s.id}" onclick="toggleStudentHw(${s.id})">
+              <i data-lucide="${d.homework_done ? 'check-circle-2' : 'circle'}" class="icon-xs"></i>
+              <span id="hw-label-${s.id}">${d.homework_done ? 'Homework Done (+Coins)' : 'Homework Not Done'}</span>
+            </button>
+
+            <div class="coin-award-input-wrap" id="coin-wrap-${s.id}" style="display: ${d.homework_done ? 'inline-flex' : 'none'};">
+              <span>+</span>
+              <input type="number" id="coin-inp-${s.id}" value="${d.coins_awarded}" min="1" max="100" onchange="updateStudentCoinDraft(${s.id}, this.value)" />
+              <span>ZED Coin</span>
+            </div>
+          </div>
         </div>
-      </div>
-    `
-      )
+      `;
+      })
       .join('');
+    refreshIcons();
   };
 
   groupSelect?.addEventListener('change', renderSheet);
+  dateInput?.addEventListener('change', renderSheet);
   if (groupsList.length > 0) renderSheet();
 
   document.getElementById('save-att-btn')?.addEventListener('click', async () => {
     const gid = parseInt(groupSelect.value, 10);
-    const dateVal = document.getElementById('att-date-input').value;
-    const records = Object.entries(state.attendanceDraft).map(([student_id, status]) => ({
+    const dateVal = dateInput.value;
+    const records = Object.entries(state.attendanceDraft).map(([student_id, info]) => ({
       student_id: parseInt(student_id, 10),
-      status
+      status: info.status,
+      homework_done: info.homework_done,
+      coins_awarded: info.homework_done ? (parseInt(info.coins_awarded, 10) || 10) : 0
     }));
 
     try {
@@ -1073,7 +1316,7 @@ function renderTeacherAttendance(container) {
         body: JSON.stringify({ group_id: gid, date: dateVal, records })
       });
       triggerHaptic('success');
-      showToast('Attendance saved!', 'success');
+      showToast('Attendance saved & ZED Coins awarded to students!', 'success');
       loadBootstrapData();
     } catch (err) {
       showToast(err.message, 'error');
@@ -1083,13 +1326,40 @@ function renderTeacherAttendance(container) {
 
 window.setStudentAtt = (studentId, status) => {
   triggerHaptic('light');
-  state.attendanceDraft[studentId] = status;
+  if (!state.attendanceDraft[studentId]) return;
+  state.attendanceDraft[studentId].status = status;
   const row = document.getElementById(`att-row-${studentId}`);
   if (!row) return;
   row.querySelectorAll('.att-pill').forEach((b) => {
     b.className = 'att-pill';
     if (b.textContent.toLowerCase() === status) b.classList.add(`active-${status}`);
   });
+};
+
+window.toggleStudentHw = (studentId) => {
+  triggerHaptic('light');
+  const item = state.attendanceDraft[studentId];
+  if (!item) return;
+  item.homework_done = !item.homework_done;
+
+  const btn = document.getElementById(`hw-btn-${studentId}`);
+  const label = document.getElementById(`hw-label-${studentId}`);
+  const coinWrap = document.getElementById(`coin-wrap-${studentId}`);
+
+  if (item.homework_done) {
+    btn.classList.add('hw-done');
+    label.textContent = 'Homework Done (+Coins)';
+    coinWrap.style.display = 'inline-flex';
+  } else {
+    btn.classList.remove('hw-done');
+    label.textContent = 'Homework Not Done';
+    coinWrap.style.display = 'none';
+  }
+};
+
+window.updateStudentCoinDraft = (studentId, val) => {
+  if (!state.attendanceDraft[studentId]) return;
+  state.attendanceDraft[studentId].coins_awarded = Math.max(0, parseInt(val, 10) || 0);
 };
 
 function renderTeacherHomework(container) {
@@ -1187,14 +1457,112 @@ window.deleteHw = async (id) => {
   }
 };
 
-// ==================== STUDENT VIEWS ====================
+// ==================== STUDENT DASHBOARD (ZED COINS + NEXT LESSON + DAILY QUIZ) ====================
 function renderStudentDashboard(container) {
   const myAtt = state.attendance.filter((a) => a.student_id === state.user.id);
   const presentCount = myAtt.filter((a) => a.status === 'present' || a.status === 'late').length;
   const attRate = myAtt.length > 0 ? Math.round((presentCount / myAtt.length) * 100) : 100;
   const myGroup = state.groups.find((g) => g.id === state.user.group_id);
+  const myCoins = state.user.zed_coins || 0;
+
+  // Next Lesson Computation
+  const nextInfo = computeNextLessonInfo(myGroup?.schedule || 'Mon-Wed-Fri • 15:00');
+
+  // Latest Daily Quiz
+  const latestQuiz = state.quizzes[0] || null;
+  const mySubmission = latestQuiz
+    ? state.quiz_submissions.find((qs) => qs.quiz_id === latestQuiz.id && qs.student_id === state.user.id)
+    : null;
 
   container.innerHTML = `
+    <!-- 1. TOP ZED COINS WALLET HERO -->
+    <div class="zed-coin-hero fade-in-up">
+      <div class="coin-hero-left">
+        <div class="coin-tag">
+          <i data-lucide="sparkles" class="icon-xs"></i>
+          <span>ZED Rewards Balance</span>
+        </div>
+        <div class="coin-balance-row">
+          <span class="coin-amount" id="student-coin-balance">${myCoins}</span>
+          <span class="coin-unit">ZED Coins</span>
+        </div>
+        <div class="coin-ways-hint">
+          <span>✨ Homework Done: +Coins</span>
+          <span>• 🧠 Daily Quiz: +10 Coins</span>
+        </div>
+      </div>
+      <div class="coin-emblem">
+        <i data-lucide="coins" class="icon-lg"></i>
+      </div>
+    </div>
+
+    <!-- 2. NEXT LESSON BANNER -->
+    <div class="next-lesson-card fade-in-up">
+      <div class="next-lesson-info">
+        <div class="next-lesson-label">
+          <i data-lucide="calendar-clock" class="icon-xs"></i>
+          <span>Next Scheduled Lesson</span>
+        </div>
+        <h3>${nextInfo.label}</h3>
+        <div class="next-lesson-meta">
+          <span>Group: <b>${myGroup ? myGroup.name : 'Unassigned'}</b></span>
+          <span>• Instructor: <b>${myGroup?.teacher_name || 'TBA'}</b></span>
+        </div>
+      </div>
+      <div class="countdown-box">
+        <div class="countdown-label">Starts In</div>
+        <div class="countdown-timer" id="next-lesson-timer">${nextInfo.remainingText}</div>
+      </div>
+    </div>
+
+    <!-- 3. DAILY QUIZ CHALLENGE (+10 ZED COINS) -->
+    <div class="quiz-card fade-in-up">
+      <div class="section-header">
+        <div class="section-title">
+          <i data-lucide="brain-circuit" class="icon-sm"></i>
+          <span>Daily Quiz Challenge</span>
+        </div>
+        <span class="badge badge-gold">+${latestQuiz ? latestQuiz.reward_coins : 10} ZED Coins</span>
+      </div>
+      ${
+        !latestQuiz
+          ? `<p class="row-sub">No daily quiz posted yet. Check back soon!</p>`
+          : `
+          <div class="quiz-question-box">${latestQuiz.question}</div>
+          <div class="quiz-options-grid">
+            ${['A', 'B', 'C']
+              .map((letter) => {
+                const optText = latestQuiz[`option_${letter.toLowerCase()}`];
+                let btnClass = 'quiz-option-btn';
+                if (mySubmission) {
+                  if (letter === latestQuiz.correct_option) btnClass += ' correct-choice';
+                  else if (letter === mySubmission.selected_option && !mySubmission.is_correct) btnClass += ' wrong-choice';
+                }
+                return `
+                  <button type="button" class="${btnClass}" ${mySubmission ? 'disabled' : ''} onclick="submitQuizAnswer(${latestQuiz.id}, '${letter}')">
+                    <span class="quiz-opt-letter">${letter}</span>
+                    <span>${optText}</span>
+                  </button>
+                `;
+              })
+              .join('')}
+          </div>
+          ${
+            mySubmission
+              ? `<div style="margin-top:12px;">
+                  ${
+                    mySubmission.is_correct
+                      ? `<span class="badge badge-success">✅ Correct! You earned +${mySubmission.coins_earned} ZED Coins!</span>`
+                      : `<span class="badge badge-danger">❌ Incorrect. Correct answer was Option ${latestQuiz.correct_option}.</span>`
+                  }
+                </div>`
+              : ''
+          }
+        `
+      }
+    </div>
+
+    <!-- 4. GROUP & ATTENDANCE STATS -->
     <div class="stats-grid fade-in-up">
       <div class="stat-card">
         <div>
@@ -1224,9 +1592,10 @@ function renderStudentDashboard(container) {
       </div>
     </div>
 
+    <!-- 5. ATTENDANCE & HOMEWORK COIN HISTORY -->
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title"><i data-lucide="calendar-days" class="icon-sm"></i><span>Attendance History</span></div>
+        <div class="section-title"><i data-lucide="calendar-days" class="icon-sm"></i><span>Attendance & Homework Log</span></div>
       </div>
       <div class="item-list">
         ${
@@ -1240,9 +1609,15 @@ function renderStudentDashboard(container) {
                 <div class="list-row">
                   <div class="row-main">
                     <h4>${new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</h4>
-                    <div class="row-sub"><span>${a.group_name || ''}</span></div>
+                    <div class="row-sub">
+                      <span>${a.group_name || ''}</span>
+                      <span>• ${a.homework_done ? '✅ Homework Done' : '❌ No Homework'}</span>
+                    </div>
                   </div>
-                  <span class="badge ${badge}">${a.status}</span>
+                  <div class="att-controls">
+                    ${a.coins_awarded > 0 ? `<span class="badge badge-gold">+${a.coins_awarded} ZED</span>` : ''}
+                    <span class="badge ${badge}">${a.status}</span>
+                  </div>
                 </div>
               `;
                 })
@@ -1252,6 +1627,29 @@ function renderStudentDashboard(container) {
     </div>
   `;
 }
+
+window.submitQuizAnswer = async (quizId, optionLetter) => {
+  try {
+    const res = await apiRequest(`/api/quizzes/${quizId}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({
+        student_id: state.user.id,
+        selected_option: optionLetter
+      })
+    });
+
+    if (res.is_correct) {
+      triggerHaptic('success');
+      showToast(`🎉 Correct! You earned +${res.coins_earned} ZED Coins!`, 'success');
+    } else {
+      triggerHaptic('error');
+      showToast(`Wrong answer! The correct option was ${res.correct_option}.`, 'error');
+    }
+    loadBootstrapData();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
 
 function renderStudentHomework(container) {
   const myHw = state.user.group_id
@@ -1279,7 +1677,7 @@ function renderStudentHomework(container) {
                   </div>
                   <p class="row-sub" style="margin-top:6px; color: var(--text-primary);">${h.description || ''}</p>
                 </div>
-                <span class="badge badge-info">Active</span>
+                <span class="badge badge-gold">Complete for +ZED Coins</span>
               </div>
             `
                 )
