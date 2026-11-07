@@ -17,8 +17,8 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Auto-ensure new columns/tables exist even if SQL wasn't re-run manually
-async function ensureGamificationSchema() {
+// Auto-ensure all tables including payment_settings exist
+async function ensureDatabaseSchema() {
   try {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS zed_coins INTEGER NOT NULL DEFAULT 0;`);
     await pool.query(`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS homework_done BOOLEAN NOT NULL DEFAULT FALSE;`);
@@ -45,12 +45,23 @@ async function ensureGamificationSchema() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(quiz_id, student_id)
       );
+      CREATE TABLE IF NOT EXISTS payment_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        card_number VARCHAR(60) NOT NULL DEFAULT '8600 0000 0000 0000',
+        card_holder VARCHAR(120) NOT NULL DEFAULT 'ZED ACADEMY ADMIN',
+        bank_name VARCHAR(100) NOT NULL DEFAULT 'Uzcard / Humo',
+        payment_note VARCHAR(255) DEFAULT 'Please transfer your monthly tuition to this card and upload the receipt screenshot below.',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO payment_settings (id, card_number, card_holder, bank_name, payment_note)
+      VALUES (1, '8600 1234 5678 9012', 'ABDURAHMON DIRECTOR', 'Uzcard / Humo', 'Transfer exact tuition amount and upload screenshot below.')
+      ON CONFLICT (id) DO NOTHING;
     `);
   } catch (err) {
     console.error('Schema check warning:', err.message);
   }
 }
-ensureGamificationSchema();
+ensureDatabaseSchema();
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -155,7 +166,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Update Own Profile
 app.put('/api/profile', async (req, res) => {
   try {
     const { id, full_name, username, phone, current_password, new_password } = req.body;
@@ -196,7 +206,7 @@ app.put('/api/profile', async (req, res) => {
 // ================= BOOTSTRAP ALL DATA =================
 app.get('/api/bootstrap', async (req, res) => {
   try {
-    const [uRes, gRes, aRes, hRes, pRes, qRes, qsRes] = await Promise.all([
+    const [uRes, gRes, aRes, hRes, pRes, qRes, qsRes, cardRes] = await Promise.all([
       pool.query(`
         SELECT u.id, u.full_name, u.username, LOWER(u.role) AS role, u.phone, u.group_id, u.telegram_id, u.zed_coins,
                g.name AS group_name
@@ -242,9 +252,8 @@ app.get('/api/bootstrap', async (req, res) => {
         ORDER BY q.id DESC
         LIMIT 30
       `),
-      pool.query(`
-        SELECT * FROM quiz_submissions ORDER BY id DESC
-      `)
+      pool.query(`SELECT * FROM quiz_submissions ORDER BY id DESC`),
+      pool.query(`SELECT * FROM payment_settings WHERE id = 1 LIMIT 1`)
     ]);
 
     res.json({
@@ -254,11 +263,50 @@ app.get('/api/bootstrap', async (req, res) => {
       homeworks: hRes.rows,
       payments: pRes.rows,
       quizzes: qRes.rows,
-      quiz_submissions: qsRes.rows
+      quiz_submissions: qsRes.rows,
+      payment_card: cardRes.rows[0] || {
+        card_number: '8600 1234 5678 9012',
+        card_holder: 'ZED ACADEMY',
+        bank_name: 'Uzcard / Humo',
+        payment_note: 'Transfer monthly fee to this card and upload receipt screenshot.'
+      }
     });
   } catch (err) {
     console.error('Bootstrap error:', err.message);
     res.status(500).json({ error: 'Database error: ' + err.message });
+  }
+});
+
+// ================= UPDATE PAYMENT CARD DETAILS (ADMIN) =================
+app.put('/api/payment-settings', async (req, res) => {
+  try {
+    const { card_number, card_holder, bank_name, payment_note } = req.body;
+    if (!card_number || !card_holder) {
+      return res.status(400).json({ error: 'Card number and card holder name are required.' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO payment_settings (id, card_number, card_holder, bank_name, payment_note, updated_at)
+       VALUES (1, $1, $2, $3, $4, CURRENT_TIMESTAMP)
+       ON CONFLICT (id)
+       DO UPDATE SET
+         card_number = EXCLUDED.card_number,
+         card_holder = EXCLUDED.card_holder,
+         bank_name = EXCLUDED.bank_name,
+         payment_note = EXCLUDED.payment_note,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [
+        card_number.trim(),
+        card_holder.trim().toUpperCase(),
+        (bank_name || 'Uzcard / Humo').trim(),
+        (payment_note || '').trim()
+      ]
+    );
+
+    res.json({ payment_card: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -406,7 +454,6 @@ app.post('/api/attendance', async (req, res) => {
       const hwDone = Boolean(rec.homework_done);
       const newCoins = hwDone ? Math.max(0, parseInt(rec.coins_awarded, 10) || 0) : 0;
 
-      // Check if attendance was already marked for this student on this date to prevent duplicate coins
       const prevRes = await client.query(
         `SELECT coins_awarded FROM attendance WHERE student_id = $1 AND group_id = $2 AND date = $3`,
         [studentId, targetGroupId, targetDate]
@@ -437,14 +484,13 @@ app.post('/api/attendance', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Attendance & Coin error:', err.message);
     res.status(500).json({ error: err.message });
   } finally {
     client.release();
   }
 });
 
-// ================= DAILY QUIZ (ADMIN CREATE & STUDENT SUBMIT) =================
+// ================= DAILY QUIZ =================
 app.post('/api/quizzes', async (req, res) => {
   try {
     const { question, option_a, option_b, option_c, correct_option, reward_coins } = req.body;
@@ -488,7 +534,6 @@ app.post('/api/quizzes/:id/answer', async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Check if student already answered this quiz
     const existing = await client.query(
       'SELECT id FROM quiz_submissions WHERE quiz_id = $1 AND student_id = $2',
       [quizId, studentId]
@@ -599,7 +644,7 @@ function startBot(webAppUrl) {
     bot.start((ctx) => {
       const firstName = ctx.from?.first_name || 'Student';
       ctx.reply(
-        `Welcome to ZED Academy, ${firstName}!\n\nTap below to open your learning portal, earn ZED Coins, and check your classes:`,
+        `Welcome to ZED Academy, ${firstName}!\n\nTap below to open your learning portal:`,
         Markup.inlineKeyboard([[Markup.button.webApp('Open ZED Academy Portal', webAppUrl)]])
       );
     });
