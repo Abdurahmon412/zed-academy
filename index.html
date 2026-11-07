@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ZED Academy Portal</title>
+  <meta name="description" content="ZED Academy Official Learning & Student Management Portal. Earn ZED Coins, complete Daily Quizzes, track attendance and assignments." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -50,7 +51,7 @@
         <!-- SIGN IN PANEL -->
         <div id="signin-panel">
           <h1 class="auth-title">Welcome Back</h1>
-          <p class="auth-subtitle">Sign in to access your ZED Academy learning & management portal</p>
+          <p class="auth-subtitle">Sign in to access your ZED Academy learning & rewards portal</p>
 
           <form id="login-form" class="form-stack">
             <div class="input-group">
@@ -164,9 +165,15 @@
               <h2 id="header-user-name">User Name</h2>
               <i data-lucide="pen-line" class="edit-hint-icon"></i>
             </div>
-            <div class="role-badge">
-              <i data-lucide="shield-check" class="icon-xs"></i>
-              <span id="header-role-text">Role</span>
+            <div class="role-badge-row">
+              <div class="role-badge">
+                <i data-lucide="shield-check" class="icon-xs"></i>
+                <span id="header-role-text">Role</span>
+              </div>
+              <div class="header-coin-pill" id="header-coin-pill" style="display: none;">
+                <i data-lucide="coins" class="icon-xs"></i>
+                <span id="header-coin-count">0</span>
+              </div>
             </div>
           </div>
         </div>
@@ -285,7 +292,7 @@
           </div>
         </div>
         <div class="input-group">
-          <label>Schedule</label>
+          <label>Schedule (e.g. Mon-Wed-Fri • 15:00)</label>
           <div class="input-field-wrap">
             <i data-lucide="calendar" class="input-icon"></i>
             <input type="text" id="edit-grp-schedule" required />
@@ -306,7 +313,7 @@
     </div>
   </div>
 
-  <!-- ==================== 3. EDIT STUDENT / ASSIGN GROUP MODAL (ADMIN) ==================== -->
+  <!-- ==================== 3. EDIT STUDENT / ASSIGN GROUP & COINS MODAL (ADMIN) ==================== -->
   <div class="modal-backdrop" id="edit-student-modal">
     <div class="modal-sheet">
       <div class="modal-header">
@@ -314,7 +321,7 @@
           <div class="modal-icon-badge"><i data-lucide="users" class="icon-md"></i></div>
           <div>
             <h3>Manage Student</h3>
-            <p class="modal-subtitle">Assign group or update student credentials</p>
+            <p class="modal-subtitle">Assign group, edit info or adjust ZED Coins</p>
           </div>
         </div>
         <button type="button" class="icon-btn modal-close" id="close-edit-student-modal"><i data-lucide="x"></i></button>
@@ -334,6 +341,13 @@
           <div class="input-field-wrap">
             <i data-lucide="layers" class="input-icon"></i>
             <select id="edit-stu-group"></select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>ZED Coins Balance</label>
+          <div class="input-field-wrap">
+            <i data-lucide="coins" class="input-icon"></i>
+            <input type="number" id="edit-stu-coins" min="0" required />
           </div>
         </div>
         <div class="input-group">
