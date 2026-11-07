@@ -12,6 +12,8 @@
   --primary-hover: #1d4ed8;
   --primary-soft: rgba(37, 99, 235, 0.12);
   --accent: #0ea5e9;
+  --gold: #f59e0b;
+  --gold-soft: rgba(245, 158, 11, 0.16);
   --success: #10b981;
   --success-soft: rgba(16, 185, 129, 0.14);
   --warning: #f59e0b;
@@ -39,6 +41,8 @@
   --primary-hover: #60a5fa;
   --primary-soft: rgba(59, 130, 246, 0.18);
   --accent: #38bdf8;
+  --gold: #fbbf24;
+  --gold-soft: rgba(251, 191, 36, 0.2);
   --success: #34d399;
   --success-soft: rgba(52, 211, 153, 0.18);
   --warning: #fbbf24;
@@ -151,7 +155,6 @@ body {
   animation: floatPulse 3.5s ease-in-out infinite;
 }
 
-/* Auth Mode Switcher */
 .auth-mode-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -448,17 +451,37 @@ body {
   flex-shrink: 0;
 }
 
+.role-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
 .role-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-top: 4px;
   padding: 3px 10px;
   border-radius: 999px;
   background: var(--primary-soft);
   color: var(--primary);
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 700;
+}
+
+.header-coin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
 }
 
 .header-actions {
@@ -519,6 +542,236 @@ body {
   color: #ffffff;
   border-color: var(--primary);
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+}
+
+/* ==================== ZED COIN HERO WALLET (STUDENT TOP BANNER) ==================== */
+.zed-coin-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 55%, #b45309 100%);
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(245, 158, 11, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.zed-coin-hero::after {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -15%;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+}
+
+.coin-hero-left {
+  position: relative;
+  z-index: 1;
+}
+
+.coin-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.coin-balance-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.coin-amount {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.coin-unit {
+  font-size: 0.95rem;
+  font-weight: 700;
+  opacity: 0.92;
+}
+
+.coin-ways-hint {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  opacity: 0.92;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.coin-emblem {
+  position: relative;
+  z-index: 1;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  animation: floatPulse 3s ease-in-out infinite;
+}
+
+/* ==================== NEXT LESSON BANNER ==================== */
+.next-lesson-card {
+  background: linear-gradient(135deg, var(--primary-soft), rgba(14, 165, 233, 0.08));
+  border: 1.5px solid rgba(37, 99, 235, 0.25);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.next-lesson-info h3 {
+  font-size: 0.98rem;
+  font-weight: 800;
+  margin-top: 3px;
+  margin-bottom: 4px;
+}
+
+.next-lesson-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.next-lesson-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.countdown-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 8px 13px;
+  text-align: right;
+  box-shadow: var(--shadow-sm);
+}
+
+.countdown-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.countdown-timer {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==================== DAILY QUIZ CARD ==================== */
+.quiz-card {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.quiz-question-box {
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.45;
+  padding: 13px 14px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border-left: 4px solid var(--gold);
+}
+
+.quiz-options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.quiz-option-btn {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.quiz-option-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  transform: translateX(3px);
+}
+
+.quiz-opt-letter {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.8rem;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.quiz-option-btn.correct-choice {
+  border-color: var(--success);
+  background: var(--success-soft);
+  color: var(--success);
+}
+.quiz-option-btn.wrong-choice {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 /* ==================== CARDS & STATS ==================== */
@@ -582,6 +835,7 @@ body {
   justify-content: space-between;
   margin-bottom: 14px;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .section-title {
@@ -608,6 +862,7 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 13px;
   transition: transform 0.15s ease;
+  flex-wrap: wrap;
 }
 
 .list-row:hover { transform: translateX(2px); }
@@ -623,17 +878,17 @@ body {
   color: var(--text-secondary);
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 4px 10px;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: 0.73rem;
   font-weight: 700;
   text-transform: capitalize;
 }
@@ -641,6 +896,7 @@ body {
 .badge-warning { background: var(--warning-soft); color: var(--warning); }
 .badge-danger  { background: var(--danger-soft);  color: var(--danger); }
 .badge-info    { background: var(--primary-soft); color: var(--primary); }
+.badge-gold    { background: var(--gold-soft);    color: var(--gold); }
 
 .progress-wrap { margin-top: 10px; }
 .progress-bar-bg {
@@ -657,20 +913,96 @@ body {
   transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.att-controls { display: flex; gap: 6px; }
+/* Teacher Attendance + Homework & Coin Controls */
+.att-student-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+}
+
+.att-top-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.att-bottom-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  flex-wrap: wrap;
+}
+
+.att-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .att-pill {
   padding: 6px 11px;
   border-radius: 9px;
   border: 1px solid var(--border-color);
   background: var(--bg-surface);
   color: var(--text-secondary);
-  font-size: 0.78rem;
+  font-size: 0.77rem;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 .att-pill.active-present { background: var(--success); color: #fff; border-color: var(--success); }
 .att-pill.active-late { background: var(--warning); color: #fff; border-color: var(--warning); }
 .att-pill.active-absent { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+.hw-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.hw-toggle-btn.hw-done {
+  background: var(--gold-soft);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.coin-award-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--gold);
+  border-radius: 9px;
+  padding: 4px 9px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.coin-award-input-wrap input {
+  width: 48px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.82rem;
+  text-align: center;
+  outline: none;
+}
 
 /* ==================== MODALS ==================== */
 .modal-backdrop {
@@ -790,7 +1122,6 @@ body {
 .toast-item.success { border-left-color: var(--success); }
 .toast-item.error   { border-left-color: var(--danger); }
 
-/* ==================== ANIMATIONS ==================== */
 .fade-in-up {
   animation: fadeInUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -818,4 +1149,5 @@ body {
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .logout-pill span { display: none; }
+  .coin-amount { font-size: 1.85rem; }
 }
