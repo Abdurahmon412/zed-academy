@@ -4,7 +4,6 @@ if (tg) {
   tg.expand();
 }
 
-// Get unique Telegram User ID if opened inside Telegram Mini App
 function getTelegramUserId() {
   const tgUser = tg?.initDataUnsafe?.user;
   if (tgUser && tgUser.id) {
@@ -25,7 +24,6 @@ function triggerHaptic(type = 'light') {
   } catch (_) {}
 }
 
-// Global Application State
 const state = {
   user: JSON.parse(localStorage.getItem('zed_user') || 'null'),
   theme: localStorage.getItem('zed_theme') || (tg?.colorScheme === 'dark' ? 'dark' : 'light'),
@@ -38,7 +36,6 @@ const state = {
   attendanceDraft: {}
 };
 
-// ==================== THEME MANAGEMENT ====================
 function applyTheme(theme) {
   state.theme = theme;
   document.documentElement.setAttribute('data-theme', theme);
@@ -64,9 +61,9 @@ function refreshIcons() {
   }
 }
 
-// ==================== TOAST NOTIFICATIONS ====================
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
+  if (!container) return;
   const toast = document.createElement('div');
   toast.className = `toast-item ${type}`;
   toast.innerHTML = `<span>${message}</span>`;
@@ -74,23 +71,22 @@ function showToast(message, type = 'info') {
   setTimeout(() => {
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 250);
-  }, 3400);
+  }, 3500);
 }
 
-// ==================== API HELPER ====================
 async function apiRequest(url, options = {}) {
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
     ...options
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.error || 'Request failed');
+    throw new Error(data.error || 'Server error occurred');
   }
   return data;
 }
 
-// ==================== AUTH MODE SWITCH (SIGN IN / SIGN UP) ====================
+// ==================== AUTH CONTROLS ====================
 const signinPanel = document.getElementById('signin-panel');
 const signupPanel = document.getElementById('signup-panel');
 const tabSigninBtn = document.getElementById('tab-signin-btn');
@@ -100,9 +96,11 @@ async function loadPublicGroupsForSignup() {
   try {
     const { groups } = await apiRequest('/api/public/groups');
     const select = document.getElementById('reg-group');
-    select.innerHTML =
-      `<option value="">Choose your study group...</option>` +
-      (groups || []).map((g) => `<option value="${g.id}">${g.name} (${g.level})</option>`).join('');
+    if (select) {
+      select.innerHTML =
+        `<option value="">Choose your study group...</option>` +
+        (groups || []).map((g) => `<option value="${g.id}">${g.name} (${g.level})</option>`).join('');
+    }
   } catch (_) {}
 }
 
@@ -112,16 +110,18 @@ function updateTelegramBanner() {
   const tgId = getTelegramUserId();
   const tgUser = tg?.initDataUnsafe?.user;
 
-  if (tgId) {
-    banner.classList.remove('warning');
-    textEl.textContent = `Telegram ID Verified: #${tgId} (1 account limit active)`;
-    const fullNameInput = document.getElementById('reg-fullname');
-    if (!fullNameInput.value && tgUser) {
-      fullNameInput.value = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
+  if (banner && textEl) {
+    if (tgId) {
+      banner.classList.remove('warning');
+      textEl.textContent = `Telegram ID Verified: #${tgId} (1 account limit active)`;
+      const fullNameInput = document.getElementById('reg-fullname');
+      if (fullNameInput && !fullNameInput.value && tgUser) {
+        fullNameInput.value = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
+      }
+    } else {
+      banner.classList.add('warning');
+      textEl.textContent = 'Please open inside Telegram Bot to verify your Telegram ID';
     }
-  } else {
-    banner.classList.add('warning');
-    textEl.textContent = 'Please open inside Telegram Bot to verify your Telegram ID';
   }
 }
 
@@ -143,12 +143,12 @@ function switchAuthMode(mode) {
   refreshIcons();
 }
 
-tabSigninBtn.addEventListener('click', () => switchAuthMode('signin'));
-tabSignupBtn.addEventListener('click', () => switchAuthMode('signup'));
-document.getElementById('go-to-signup').addEventListener('click', () => switchAuthMode('signup'));
-document.getElementById('go-to-signin').addEventListener('click', () => switchAuthMode('signin'));
+tabSigninBtn?.addEventListener('click', () => switchAuthMode('signin'));
+tabSignupBtn?.addEventListener('click', () => switchAuthMode('signup'));
+document.getElementById('go-to-signup')?.addEventListener('click', () => switchAuthMode('signup'));
+document.getElementById('go-to-signin')?.addEventListener('click', () => switchAuthMode('signin'));
 
-// ==================== LOGIN & REGISTRATION SUBMIT ====================
+// ==================== APP LIFECYCLE ====================
 const authView = document.getElementById('auth-view');
 const portalView = document.getElementById('portal-view');
 
@@ -158,12 +158,13 @@ function updateHeaderUI() {
   document.getElementById('header-avatar').textContent = initial;
   document.getElementById('header-user-name').textContent = state.user.full_name;
 
+  const role = (state.user.role || '').toLowerCase();
   const roleLabels = {
     admin: 'Director / Admin',
     teacher: 'Instructor / Teacher',
     student: 'Student'
   };
-  document.getElementById('header-role-text').textContent = roleLabels[state.user.role] || 'Member';
+  document.getElementById('header-role-text').textContent = roleLabels[role] || 'Member';
 }
 
 async function loadBootstrapData() {
@@ -207,8 +208,8 @@ function logout() {
   refreshIcons();
 }
 
-// Login Form
-document.getElementById('login-form').addEventListener('submit', async (e) => {
+// Login
+document.getElementById('login-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value.trim();
@@ -238,13 +239,13 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   }
 });
 
-// Student Self-Registration Form (Enforces 1 Account Per Telegram ID)
-document.getElementById('register-form').addEventListener('submit', async (e) => {
+// Student Self Registration
+document.getElementById('register-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const tgId = getTelegramUserId();
   if (!tgId) {
     triggerHaptic('error');
-    return showToast('Please open this portal inside the Telegram bot to register with your Telegram ID.', 'error');
+    return showToast('Please open the portal inside Telegram to verify your account.', 'error');
   }
 
   const full_name = document.getElementById('reg-fullname').value.trim();
@@ -281,20 +282,18 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
   }
 });
 
-// Password Visibility Toggles
-document.getElementById('toggle-login-pass').addEventListener('click', () => {
+// Pass Toggles
+document.getElementById('toggle-login-pass')?.addEventListener('click', () => {
   const input = document.getElementById('login-password');
   input.type = input.type === 'password' ? 'text' : 'password';
 });
-
-document.getElementById('toggle-reg-pass').addEventListener('click', () => {
+document.getElementById('toggle-reg-pass')?.addEventListener('click', () => {
   const input = document.getElementById('reg-password');
   input.type = input.type === 'password' ? 'text' : 'password';
 });
 
-// ==================== EDIT PROFILE MODAL (ALL ROLES) ====================
+// Account Settings Modal
 const profileModal = document.getElementById('profile-modal');
-
 function openProfileModal() {
   if (!state.user) return;
   triggerHaptic('light');
@@ -306,16 +305,14 @@ function openProfileModal() {
   profileModal.classList.add('open');
   refreshIcons();
 }
-
 function closeProfileModal() {
   profileModal.classList.remove('open');
 }
+document.getElementById('open-profile-modal')?.addEventListener('click', openProfileModal);
+document.getElementById('close-profile-modal')?.addEventListener('click', closeProfileModal);
+document.getElementById('cancel-profile-btn')?.addEventListener('click', closeProfileModal);
 
-document.getElementById('open-profile-modal').addEventListener('click', openProfileModal);
-document.getElementById('close-profile-modal').addEventListener('click', closeProfileModal);
-document.getElementById('cancel-profile-btn').addEventListener('click', closeProfileModal);
-
-document.getElementById('profile-edit-form').addEventListener('submit', async (e) => {
+document.getElementById('profile-edit-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!state.user) return;
 
@@ -338,7 +335,7 @@ document.getElementById('profile-edit-form').addEventListener('submit', async (e
     updateHeaderUI();
     closeProfileModal();
     triggerHaptic('success');
-    showToast('Account settings updated successfully!', 'success');
+    showToast('Account settings updated!', 'success');
     loadBootstrapData();
   } catch (err) {
     triggerHaptic('error');
@@ -346,9 +343,10 @@ document.getElementById('profile-edit-form').addEventListener('submit', async (e
   }
 });
 
-// ==================== NAVIGATION TABS PER ROLE ====================
+// Navigation Tabs
 function getTabsForRole(role) {
-  if (role === 'admin') {
+  const r = (role || 'student').toLowerCase();
+  if (r === 'admin') {
     return [
       { id: 'dashboard', label: 'Overview', icon: 'layout-dashboard' },
       { id: 'groups', label: 'Groups', icon: 'layers' },
@@ -357,7 +355,7 @@ function getTabsForRole(role) {
       { id: 'payments', label: 'Payments', icon: 'credit-card' }
     ];
   }
-  if (role === 'teacher') {
+  if (r === 'teacher') {
     return [
       { id: 'dashboard', label: 'My Groups', icon: 'book-open' },
       { id: 'attendance', label: 'Attendance', icon: 'calendar-check' },
@@ -390,16 +388,15 @@ function renderNavigationTabs() {
       triggerHaptic('light');
       state.activeTab = btn.dataset.tab;
       renderNavigationTabs();
-      renderActiveTab();
+      loadBootstrapData(); // Realtime sync on tab switch
     });
   });
   refreshIcons();
 }
 
-// ==================== RENDER PORTAL CONTENT ====================
 function renderActiveTab() {
   const container = document.getElementById('tab-content-area');
-  const role = state.user?.role || 'student';
+  const role = (state.user?.role || 'student').toLowerCase();
 
   if (role === 'admin') {
     if (state.activeTab === 'dashboard') renderAdminDashboard(container);
@@ -421,8 +418,8 @@ function renderActiveTab() {
 
 // ---------------- ADMIN VIEWS ----------------
 function renderAdminDashboard(container) {
-  const students = state.users.filter((u) => u.role === 'student');
-  const teachers = state.users.filter((u) => u.role === 'teacher');
+  const students = state.users.filter((u) => (u.role || '').toLowerCase() === 'student');
+  const teachers = state.users.filter((u) => (u.role || '').toLowerCase() === 'teacher');
   const pendingPayments = state.payments.filter((p) => p.status === 'pending');
 
   container.innerHTML = `
@@ -459,10 +456,10 @@ function renderAdminDashboard(container) {
 
     <div class="card-panel fade-in-up">
       <div class="section-header">
-        <div class="section-title">
-          <i data-lucide="sparkles" class="icon-sm"></i>
-          <span>Active Study Groups</span>
-        </div>
+        <div class="section-title"><i data-lucide="sparkles" class="icon-sm"></i><span>Active Study Groups</span></div>
+        <button class="btn btn-ghost" onclick="loadBootstrapData()" style="padding:6px 10px; font-size:0.78rem;">
+          <i data-lucide="refresh-cw" class="icon-xs"></i> <span>Refresh</span>
+        </button>
       </div>
       <div class="item-list">
         ${
@@ -492,7 +489,7 @@ function renderAdminDashboard(container) {
 }
 
 function renderAdminGroups(container) {
-  const teachers = state.users.filter((u) => u.role === 'teacher');
+  const teachers = state.users.filter((u) => (u.role || '').toLowerCase() === 'teacher');
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
@@ -566,7 +563,7 @@ function renderAdminGroups(container) {
     </div>
   `;
 
-  document.getElementById('create-group-form').addEventListener('submit', async (e) => {
+  document.getElementById('create-group-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
       await apiRequest('/api/groups', {
@@ -599,8 +596,43 @@ window.deleteGroup = async (id) => {
 };
 
 function renderAdminStudents(container) {
-  const students = state.users.filter((u) => u.role === 'student');
+  // Case-insensitive match to make sure self-registered students always show up
+  const students = state.users.filter((u) => (u.role || '').toLowerCase() === 'student');
+
   container.innerHTML = `
+    <div class="card-panel fade-in-up">
+      <div class="section-header">
+        <div class="section-title"><i data-lucide="users" class="icon-sm"></i><span>Registered Students (${students.length})</span></div>
+        <button class="btn btn-ghost" onclick="loadBootstrapData()" style="padding:6px 10px; font-size:0.78rem;">
+          <i data-lucide="refresh-cw" class="icon-xs"></i> <span>Refresh List</span>
+        </button>
+      </div>
+      <div class="item-list">
+        ${
+          students.length === 0
+            ? `<p class="row-sub">No students registered yet.</p>`
+            : students
+                .map(
+                  (s) => `
+              <div class="list-row">
+                <div class="row-main">
+                  <h4>${s.full_name}</h4>
+                  <div class="row-sub">
+                    <span>@${s.username}</span>
+                    <span>• Group: ${s.group_name || 'Unassigned'}</span>
+                    <span>• ${s.phone || 'No phone'}</span>
+                    ${s.telegram_id ? `<span class="badge badge-info">TG: #${s.telegram_id}</span>` : ''}
+                  </div>
+                </div>
+                <button class="btn btn-danger-soft" onclick="deleteUserAccount(${s.id})"><i data-lucide="trash-2" class="icon-xs"></i></button>
+              </div>
+            `
+                )
+                .join('')
+        }
+      </div>
+    </div>
+
     <div class="card-panel fade-in-up">
       <div class="section-header">
         <div class="section-title"><i data-lucide="user-plus" class="icon-sm"></i><span>Register Student Manually</span></div>
@@ -645,35 +677,9 @@ function renderAdminStudents(container) {
         <button type="submit" class="btn btn-primary"><i data-lucide="plus" class="icon-sm"></i><span>Enroll Student</span></button>
       </form>
     </div>
-
-    <div class="card-panel fade-in-up">
-      <div class="section-header">
-        <div class="section-title"><i data-lucide="users" class="icon-sm"></i><span>Enrolled Students (${students.length})</span></div>
-      </div>
-      <div class="item-list">
-        ${students
-          .map(
-            (s) => `
-          <div class="list-row">
-            <div class="row-main">
-              <h4>${s.full_name}</h4>
-              <div class="row-sub">
-                <span>@${s.username}</span>
-                <span>• Group: ${s.group_name || 'Unassigned'}</span>
-                <span>• ${s.phone || 'No phone'}</span>
-                ${s.telegram_id ? `<span class="badge badge-info">TG: #${s.telegram_id}</span>` : ''}
-              </div>
-            </div>
-            <button class="btn btn-danger-soft" onclick="deleteUserAccount(${s.id})"><i data-lucide="trash-2" class="icon-xs"></i></button>
-          </div>
-        `
-          )
-          .join('')}
-      </div>
-    </div>
   `;
 
-  document.getElementById('add-student-form').addEventListener('submit', async (e) => {
+  document.getElementById('add-student-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
       await apiRequest('/api/users', {
@@ -697,7 +703,7 @@ function renderAdminStudents(container) {
 }
 
 function renderAdminTeachers(container) {
-  const teachers = state.users.filter((u) => u.role === 'teacher');
+  const teachers = state.users.filter((u) => (u.role || '').toLowerCase() === 'teacher');
   container.innerHTML = `
     <div class="card-panel fade-in-up">
       <div class="section-header">
@@ -757,7 +763,7 @@ function renderAdminTeachers(container) {
     </div>
   `;
 
-  document.getElementById('add-teacher-form').addEventListener('submit', async (e) => {
+  document.getElementById('add-teacher-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
       await apiRequest('/api/users', {
@@ -794,6 +800,9 @@ function renderAdminPayments(container) {
     <div class="card-panel fade-in-up">
       <div class="section-header">
         <div class="section-title"><i data-lucide="credit-card" class="icon-sm"></i><span>Student Tuition Payments</span></div>
+        <button class="btn btn-ghost" onclick="loadBootstrapData()" style="padding:6px 10px; font-size:0.78rem;">
+          <i data-lucide="refresh-cw" class="icon-xs"></i> <span>Refresh</span>
+        </button>
       </div>
       <div class="item-list">
         ${
@@ -840,7 +849,7 @@ window.previewReceipt = (paymentId) => {
   document.getElementById('receipt-modal').classList.add('open');
 };
 
-document.getElementById('close-receipt-modal').addEventListener('click', () => {
+document.getElementById('close-receipt-modal')?.addEventListener('click', () => {
   document.getElementById('receipt-modal').classList.remove('open');
 });
 
@@ -930,7 +939,7 @@ function renderTeacherAttendance(container) {
   const groupSelect = document.getElementById('att-group-select');
   const renderSheet = () => {
     const gid = parseInt(groupSelect.value, 10);
-    const students = state.users.filter((u) => u.role === 'student' && u.group_id === gid);
+    const students = state.users.filter((u) => (u.role || '').toLowerCase() === 'student' && u.group_id === gid);
     const listEl = document.getElementById('att-student-list');
 
     if (students.length === 0) {
@@ -957,10 +966,10 @@ function renderTeacherAttendance(container) {
       .join('');
   };
 
-  groupSelect.addEventListener('change', renderSheet);
+  groupSelect?.addEventListener('change', renderSheet);
   if (selectedGroupId) renderSheet();
 
-  document.getElementById('save-att-btn').addEventListener('click', async () => {
+  document.getElementById('save-att-btn')?.addEventListener('click', async () => {
     const gid = parseInt(groupSelect.value, 10);
     const dateVal = document.getElementById('att-date-input').value;
     const records = Object.entries(state.attendanceDraft).map(([student_id, status]) => ({
@@ -1062,7 +1071,7 @@ function renderTeacherHomework(container) {
     </div>
   `;
 
-  document.getElementById('post-hw-form').addEventListener('submit', async (e) => {
+  document.getElementById('post-hw-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
       await apiRequest('/api/homeworks', {
@@ -1198,6 +1207,7 @@ function renderStudentHomework(container) {
   `;
 }
 
+// Client-side image compression for fast and reliable receipt upload
 function compressReceiptImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1205,18 +1215,26 @@ function compressReceiptImage(file) {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const maxW = 900;
-        const scale = img.width > maxW ? maxW / img.width : 1;
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
+        const maxDim = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > h && w > maxDim) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else if (h > maxDim) {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+        canvas.width = w;
+        canvas.height = h;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.75));
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.65));
       };
-      img.onerror = reject;
+      img.onerror = () => reject(new Error('Invalid image file'));
       img.src = e.target.result;
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error('File read error'));
     reader.readAsDataURL(file);
   });
 }
@@ -1288,17 +1306,19 @@ function renderStudentPayments(container) {
     </div>
   `;
 
-  document.getElementById('student-pay-form').addEventListener('submit', async (e) => {
+  document.getElementById('student-pay-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fileInput = document.getElementById('pay-file');
     const btn = document.getElementById('submit-pay-btn');
-    if (!fileInput.files[0]) {
+    if (!fileInput.files || !fileInput.files[0]) {
       return showToast('Please attach a receipt screenshot.', 'error');
     }
 
     try {
       btn.disabled = true;
+      btn.innerHTML = `<span>Uploading...</span>`;
       const base64Image = await compressReceiptImage(fileInput.files[0]);
+      
       await apiRequest('/api/payments', {
         method: 'POST',
         body: JSON.stringify({
@@ -1308,21 +1328,26 @@ function renderStudentPayments(container) {
           receipt_image: base64Image
         })
       });
+
       triggerHaptic('success');
-      showToast('Receipt submitted for verification!', 'success');
+      showToast('Receipt submitted successfully for verification!', 'success');
+      fileInput.value = '';
       loadBootstrapData();
     } catch (err) {
+      triggerHaptic('error');
       showToast(err.message, 'error');
     } finally {
       btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="send" class="icon-sm"></i><span>Submit Payment Receipt</span>`;
+      refreshIcons();
     }
   });
 }
 
-// ==================== INITIALIZATION ====================
-document.getElementById('auth-theme-toggle').addEventListener('click', toggleTheme);
-document.getElementById('portal-theme-toggle').addEventListener('click', toggleTheme);
-document.getElementById('logout-btn').addEventListener('click', logout);
+// Initial triggers
+document.getElementById('auth-theme-toggle')?.addEventListener('click', toggleTheme);
+document.getElementById('portal-theme-toggle')?.addEventListener('click', toggleTheme);
+document.getElementById('logout-btn')?.addEventListener('click', logout);
 
 applyTheme(state.theme);
 if (state.user) {
